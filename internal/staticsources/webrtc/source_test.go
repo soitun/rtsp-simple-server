@@ -8,15 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/pion/rtp"
-	pwebrtc "github.com/pion/webrtc/v3"
+	pwebrtc "github.com/pion/webrtc/v4"
 	"github.com/stretchr/testify/require"
 
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
 	"github.com/bluenviron/mediamtx/internal/protocols/webrtc"
-	"github.com/bluenviron/mediamtx/internal/staticsources/tester"
+	"github.com/bluenviron/mediamtx/internal/test"
 )
 
 func whipOffer(body []byte) *pwebrtc.SessionDescription {
@@ -27,25 +26,28 @@ func whipOffer(body []byte) *pwebrtc.SessionDescription {
 }
 
 func TestSource(t *testing.T) {
-	api, err := webrtc.NewAPI(webrtc.APIConf{})
-	require.NoError(t, err)
+	outgoingTracks := []*webrtc.OutgoingTrack{{
+		Caps: pwebrtc.RTPCodecCapability{
+			MimeType:    "audio/opus",
+			ClockRate:   48000,
+			Channels:    2,
+			SDPFmtpLine: "minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1",
+		},
+	}}
 
 	pc := &webrtc.PeerConnection{
-		API:     api,
-		Publish: true,
+		LocalRandomUDP:     true,
+		IPsFromInterfaces:  true,
+		Publish:            true,
+		HandshakeTimeout:   conf.Duration(10 * time.Second),
+		TrackGatherTimeout: conf.Duration(2 * time.Second),
+		STUNGatherTimeout:  conf.Duration(5 * time.Second),
+		OutgoingTracks:     outgoingTracks,
+		Log:                test.NilLogger,
 	}
-	err = pc.Start()
+	err := pc.Start()
 	require.NoError(t, err)
 	defer pc.Close()
-
-	tracks, err := pc.SetupOutgoingTracks(
-		nil,
-		&format.Opus{
-			PayloadTyp: 111,
-			IsStereo:   true,
-		},
-	)
-	require.NoError(t, err)
 
 	state := 0
 
@@ -65,12 +67,12 @@ func TestSource(t *testing.T) {
 				require.Equal(t, "/my/resource", r.URL.Path)
 				require.Equal(t, "application/sdp", r.Header.Get("Content-Type"))
 
-				body, err := io.ReadAll(r.Body)
-				require.NoError(t, err)
+				body, err2 := io.ReadAll(r.Body)
+				require.NoError(t, err2)
 				offer := whipOffer(body)
 
-				answer, err := pc.CreateFullAnswer(context.Background(), offer)
-				require.NoError(t, err)
+				answer, err2 := pc.CreateFullAnswer(context.Background(), offer)
+				require.NoError(t, err2)
 
 				w.Header().Set("Content-Type", "application/sdp")
 				w.Header().Set("Accept-Patch", "application/trickle-ice-sdpfrag")
@@ -80,10 +82,10 @@ func TestSource(t *testing.T) {
 				w.Write([]byte(answer.SDP))
 
 				go func() {
-					err = pc.WaitUntilConnected(context.Background())
-					require.NoError(t, err)
+					err3 := pc.WaitUntilReady(context.Background())
+					require.NoError(t, err3)
 
-					err = tracks[0].WriteRTP(&rtp.Packet{
+					err3 = outgoingTracks[0].WriteRTP(&rtp.Packet{
 						Header: rtp.Header{
 							Version:        2,
 							Marker:         true,
@@ -94,7 +96,7 @@ func TestSource(t *testing.T) {
 						},
 						Payload: []byte{5, 2},
 					})
-					require.NoError(t, err)
+					require.NoError(t, err3)
 				}()
 
 			default:
@@ -121,16 +123,15 @@ func TestSource(t *testing.T) {
 	go httpServ.Serve(ln)
 	defer httpServ.Shutdown(context.Background())
 
-	te := tester.New(
+	te := test.NewSourceTester(
 		func(p defs.StaticSourceParent) defs.StaticSource {
 			return &Source{
-				ReadTimeout: conf.StringDuration(10 * time.Second),
+				ReadTimeout: conf.Duration(10 * time.Second),
 				Parent:      p,
 			}
 		},
-		&conf.Path{
-			Source: "whep://localhost:9003/my/resource",
-		},
+		"whep://localhost:9003/my/resource",
+		&conf.Path{},
 	)
 	defer te.Close()
 

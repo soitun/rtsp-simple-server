@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
-	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h265"
 	"github.com/pion/rtp"
 	"github.com/stretchr/testify/require"
 
@@ -198,7 +198,7 @@ func TestH265EmptyPacket(t *testing.T) {
 }
 
 func FuzzRTPH265ExtractParams(f *testing.F) {
-	f.Fuzz(func(t *testing.T, b []byte) {
+	f.Fuzz(func(_ *testing.T, b []byte) {
 		rtpH265ExtractParams(b)
 	})
 }

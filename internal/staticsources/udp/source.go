@@ -8,7 +8,7 @@ import (
 
 	"github.com/bluenviron/gortsplib/v4/pkg/description"
 	"github.com/bluenviron/gortsplib/v4/pkg/multicast"
-	mcmpegts "github.com/bluenviron/mediacommon/pkg/formats/mpegts"
+	mcmpegts "github.com/bluenviron/mediacommon/v2/pkg/formats/mpegts"
 
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
@@ -45,11 +45,11 @@ type packetConn interface {
 
 // Source is a UDP static source.
 type Source struct {
-	ReadTimeout conf.StringDuration
+	ReadTimeout conf.Duration
 	Parent      defs.StaticSourceParent
 }
 
-// Log implements StaticSource.
+// Log implements logger.Writer.
 func (s *Source) Log(level logger.Level, format string, args ...interface{}) {
 	s.Parent.Log(level, "[UDP source] "+format, args...)
 }
@@ -58,7 +58,7 @@ func (s *Source) Log(level logger.Level, format string, args ...interface{}) {
 func (s *Source) Run(params defs.StaticSourceRunParams) error {
 	s.Log(logger.Debug, "connecting")
 
-	hostPort := params.Conf.Source[len("udp://"):]
+	hostPort := params.ResolvedSource[len("udp://"):]
 
 	addr, err := net.ResolveUDPAddr("udp", hostPort)
 	if err != nil {
@@ -73,7 +73,8 @@ func (s *Source) Run(params defs.StaticSourceRunParams) error {
 			return err
 		}
 	} else {
-		tmp, err := net.ListenPacket(restrictnetwork.Restrict("udp", addr.String()))
+		var tmp net.PacketConn
+		tmp, err = net.ListenPacket(restrictnetwork.Restrict("udp", addr.String()))
 		if err != nil {
 			return err
 		}
@@ -118,7 +119,7 @@ func (s *Source) runReader(pc net.PacketConn) error {
 
 	var stream *stream.Stream
 
-	medias, err := mpegts.ToStream(r, &stream)
+	medias, err := mpegts.ToStream(r, &stream, s)
 	if err != nil {
 		return err
 	}

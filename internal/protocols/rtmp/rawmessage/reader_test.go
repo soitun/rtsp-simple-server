@@ -12,10 +12,9 @@ import (
 )
 
 var cases = []struct {
-	name       string
-	messages   []*Message
-	chunks     []chunk.Chunk
-	chunkSizes []uint32
+	name     string
+	messages []*Message
+	chunks   []chunk.Chunk
 }{
 	{
 		"(chunk0) + (chunk1)",
@@ -51,10 +50,6 @@ var cases = []struct {
 				BodyLen:        64,
 				Body:           bytes.Repeat([]byte{0x04}, 64),
 			},
-		},
-		[]uint32{
-			128,
-			128,
 		},
 	},
 	{
@@ -100,11 +95,6 @@ var cases = []struct {
 				ChunkStreamID: 27,
 				Body:          bytes.Repeat([]byte{0x05}, 64),
 			},
-		},
-		[]uint32{
-			128,
-			64,
-			64,
 		},
 	},
 	{
@@ -181,15 +171,31 @@ var cases = []struct {
 				Body:          bytes.Repeat([]byte{0x06}, 64),
 			},
 		},
-		[]uint32{
-			128,
-			62,
-			128,
-			64,
-			128,
-			64,
-			128,
-			64,
+	},
+	{
+		"(chunk0 + chunk3 with extended timestamp)",
+		[]*Message{
+			{
+				ChunkStreamID:   27,
+				Timestamp:       0xFF123456 * time.Millisecond,
+				Type:            6,
+				MessageStreamID: 3123,
+				Body:            bytes.Repeat([]byte{5}, 160),
+			},
+		},
+		[]chunk.Chunk{
+			&chunk.Chunk0{
+				ChunkStreamID:   27,
+				Timestamp:       4279383126,
+				Type:            6,
+				MessageStreamID: 3123,
+				BodyLen:         160,
+				Body:            bytes.Repeat([]byte{5}, 128),
+			},
+			&chunk.Chunk3{
+				ChunkStreamID: 27,
+				Body:          bytes.Repeat([]byte{5}, 32),
+			},
 		},
 	},
 }
@@ -199,14 +205,17 @@ func TestReader(t *testing.T) {
 		t.Run(ca.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			br := bytecounter.NewReader(&buf)
-			r := NewReader(br, br, func(count uint32) error {
+			r := NewReader(br, br, func(_ uint32) error {
 				return nil
 			})
 
+			hasExtendedTimestamp := false
+
 			for _, cach := range ca.chunks {
-				buf2, err := cach.Marshal()
+				buf2, err := cach.Marshal(hasExtendedTimestamp)
 				require.NoError(t, err)
 				buf.Write(buf2)
+				hasExtendedTimestamp = chunkHasExtendedTimestamp(cach)
 			}
 
 			for _, camsg := range ca.messages {
@@ -225,7 +234,7 @@ func TestReaderAcknowledge(t *testing.T) {
 
 			var buf bytes.Buffer
 			bc := bytecounter.NewReader(&buf)
-			r := NewReader(bc, bc, func(count uint32) error {
+			r := NewReader(bc, bc, func(_ uint32) error {
 				close(onAckCalled)
 				return nil
 			})
@@ -247,7 +256,7 @@ func TestReaderAcknowledge(t *testing.T) {
 				MessageStreamID: 3123,
 				BodyLen:         200,
 				Body:            bytes.Repeat([]byte{0x03}, 200),
-			}.Marshal()
+			}.Marshal(false)
 			require.NoError(t, err)
 			buf.Write(buf2)
 
@@ -260,15 +269,21 @@ func TestReaderAcknowledge(t *testing.T) {
 }
 
 func FuzzReader(f *testing.F) {
-	f.Fuzz(func(t *testing.T, b []byte) {
-		br := bytecounter.NewReader(bytes.NewReader(b))
-		r := NewReader(br, br, func(count uint32) error {
+	f.Fuzz(func(_ *testing.T, b []byte) {
+		bcr := bytecounter.NewReader(bytes.NewReader(b))
+		r := NewReader(bcr, bcr, func(_ uint32) error {
 			return nil
 		})
 
+		var buf bytes.Buffer
+		bcw := bytecounter.NewWriter(&buf)
+		w := NewWriter(bcw, bcw, true)
+
 		for {
-			_, err := r.Read()
-			if err != nil {
+			msg, err := r.Read()
+			if err == nil {
+				w.Write(msg) //nolint:errcheck
+			} else {
 				break
 			}
 		}

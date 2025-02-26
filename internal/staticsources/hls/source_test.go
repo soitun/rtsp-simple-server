@@ -1,115 +1,100 @@
 package hls
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"net"
 	"net/http"
 	"testing"
 
-	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
-	"github.com/bluenviron/mediacommon/pkg/formats/mpegts"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4audio"
+	"github.com/bluenviron/mediacommon/v2/pkg/formats/mpegts"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
-	"github.com/bluenviron/mediamtx/internal/staticsources/tester"
+	"github.com/bluenviron/mediamtx/internal/test"
 )
 
-var track1 = &mpegts.Track{
-	Codec: &mpegts.CodecH264{},
-}
-
-var track2 = &mpegts.Track{
-	Codec: &mpegts.CodecMPEG4Audio{
-		Config: mpeg4audio.Config{
-			Type:         2,
-			SampleRate:   44100,
-			ChannelCount: 2,
-		},
-	},
-}
-
-type testHLSManager struct {
-	s *http.Server
-}
-
-func newTestHLSManager() (*testHLSManager, error) {
-	ln, err := net.Listen("tcp", "localhost:5780")
-	if err != nil {
-		return nil, err
+func TestSource(t *testing.T) {
+	track1 := &mpegts.Track{
+		Codec: &mpegts.CodecH264{},
 	}
 
-	ts := &testHLSManager{}
+	track2 := &mpegts.Track{
+		Codec: &mpegts.CodecMPEG4Audio{
+			Config: mpeg4audio.Config{
+				Type:         2,
+				SampleRate:   44100,
+				ChannelCount: 2,
+			},
+		},
+	}
+
+	tracks := []*mpegts.Track{
+		track1,
+		track2,
+	}
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
-	router.GET("/stream.m3u8", ts.onPlaylist)
-	router.GET("/segment1.ts", ts.onSegment1)
-	router.GET("/segment2.ts", ts.onSegment2)
 
-	ts.s = &http.Server{Handler: router}
-	go ts.s.Serve(ln)
-
-	return ts, nil
-}
-
-func (ts *testHLSManager) close() {
-	ts.s.Shutdown(context.Background())
-}
-
-func (ts *testHLSManager) onPlaylist(ctx *gin.Context) {
-	cnt := `#EXTM3U
-#EXT-X-VERSION:3
-#EXT-X-ALLOW-CACHE:NO
-#EXT-X-TARGETDURATION:2
-#EXT-X-MEDIA-SEQUENCE:0
-#EXTINF:2,
-segment1.ts
-#EXTINF:2,
-segment2.ts
-#EXT-X-ENDLIST
-`
-
-	ctx.Writer.Header().Set("Content-Type", `application/vnd.apple.mpegurl`)
-	io.Copy(ctx.Writer, bytes.NewReader([]byte(cnt)))
-}
-
-func (ts *testHLSManager) onSegment1(ctx *gin.Context) {
-	ctx.Writer.Header().Set("Content-Type", `video/MP2T`)
-
-	w := mpegts.NewWriter(ctx.Writer, []*mpegts.Track{track1, track2})
-
-	w.WriteMPEG4Audio(track2, 1*90000, [][]byte{{1, 2, 3, 4}}) //nolint:errcheck
-}
-
-func (ts *testHLSManager) onSegment2(ctx *gin.Context) {
-	ctx.Writer.Header().Set("Content-Type", `video/MP2T`)
-
-	w := mpegts.NewWriter(ctx.Writer, []*mpegts.Track{track1, track2})
-
-	w.WriteH26x(track1, 2*90000, 2*90000, true, [][]byte{ //nolint:errcheck
-		{7, 1, 2, 3}, // SPS
-		{8},          // PPS
+	router.GET("/stream.m3u8", func(ctx *gin.Context) {
+		ctx.Header("Content-Type", `application/vnd.apple.mpegurl`)
+		ctx.Writer.Write([]byte("#EXTM3U\n" +
+			"#EXT-X-VERSION:3\n" +
+			"#EXT-X-ALLOW-CACHE:NO\n" +
+			"#EXT-X-TARGETDURATION:2\n" +
+			"#EXT-X-MEDIA-SEQUENCE:0\n" +
+			"#EXTINF:2,\n" +
+			"segment1.ts\n" +
+			"#EXTINF:2,\n" +
+			"segment2.ts\n" +
+			"#EXTINF:2,\n" +
+			"segment2.ts\n" +
+			"#EXT-X-ENDLIST\n"))
 	})
-}
 
-func TestSource(t *testing.T) {
-	ts, err := newTestHLSManager()
+	router.GET("/segment1.ts", func(ctx *gin.Context) {
+		ctx.Header("Content-Type", `video/MP2T`)
+
+		w := mpegts.NewWriter(ctx.Writer, tracks)
+
+		err := w.WriteMPEG4Audio(track2, 1*90000, [][]byte{{1, 2, 3, 4}})
+		require.NoError(t, err)
+
+		err = w.WriteH264(track1, 2*90000, 2*90000, [][]byte{
+			{7, 1, 2, 3}, // SPS
+			{8},          // PPS
+		})
+		require.NoError(t, err)
+	})
+
+	router.GET("/segment2.ts", func(ctx *gin.Context) {
+		ctx.Header("Content-Type", `video/MP2T`)
+
+		w := mpegts.NewWriter(ctx.Writer, tracks)
+
+		err := w.WriteMPEG4Audio(track2, 3*90000, [][]byte{{1, 2, 3, 4}})
+		require.NoError(t, err)
+	})
+
+	s := &http.Server{Handler: router}
+
+	ln, err := net.Listen("tcp", "localhost:5780")
 	require.NoError(t, err)
-	defer ts.close()
 
-	te := tester.New(
+	go s.Serve(ln)
+	defer s.Shutdown(context.Background())
+
+	te := test.NewSourceTester(
 		func(p defs.StaticSourceParent) defs.StaticSource {
 			return &Source{
 				Parent: p,
 			}
 		},
-		&conf.Path{
-			Source: "http://localhost:5780/stream.m3u8",
-		},
+		"http://localhost:5780/stream.m3u8",
+		&conf.Path{},
 	)
 	defer te.Close()
 

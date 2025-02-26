@@ -1,6 +1,7 @@
 package formatprocessor //nolint:dupl
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,6 +17,7 @@ type formatProcessorMPEG1Audio struct {
 	format            *format.MPEG1Audio
 	encoder           *rtpmpeg1audio.Encoder
 	decoder           *rtpmpeg1audio.Decoder
+	randomStart       uint32
 }
 
 func newMPEG1Audio(
@@ -30,6 +32,11 @@ func newMPEG1Audio(
 
 	if generateRTPPackets {
 		err := t.createEncoder()
+		if err != nil {
+			return nil, err
+		}
+
+		t.randomStart, err = randUint32()
 		if err != nil {
 			return nil, err
 		}
@@ -52,13 +59,11 @@ func (t *formatProcessorMPEG1Audio) ProcessUnit(uu unit.Unit) error { //nolint:d
 	if err != nil {
 		return err
 	}
-
-	ts := uint32(multiplyAndDivide(u.PTS, time.Duration(t.format.ClockRate()), time.Second))
-	for _, pkt := range pkts {
-		pkt.Timestamp += ts
-	}
-
 	u.RTPPackets = pkts
+
+	for _, pkt := range u.RTPPackets {
+		pkt.Timestamp += t.randomStart + uint32(u.PTS)
+	}
 
 	return nil
 }
@@ -66,9 +71,9 @@ func (t *formatProcessorMPEG1Audio) ProcessUnit(uu unit.Unit) error { //nolint:d
 func (t *formatProcessorMPEG1Audio) ProcessRTPPacket( //nolint:dupl
 	pkt *rtp.Packet,
 	ntp time.Time,
-	pts time.Duration,
+	pts int64,
 	hasNonRTSPReaders bool,
-) (Unit, error) {
+) (unit.Unit, error) {
 	u := &unit.MPEG1Audio{
 		Base: unit.Base{
 			RTPPackets: []*rtp.Packet{pkt},
@@ -98,7 +103,8 @@ func (t *formatProcessorMPEG1Audio) ProcessRTPPacket( //nolint:dupl
 
 		frames, err := t.decoder.Decode(pkt)
 		if err != nil {
-			if err == rtpmpeg1audio.ErrNonStartingPacketAndNoPrevious || err == rtpmpeg1audio.ErrMorePacketsNeeded {
+			if errors.Is(err, rtpmpeg1audio.ErrNonStartingPacketAndNoPrevious) ||
+				errors.Is(err, rtpmpeg1audio.ErrMorePacketsNeeded) {
 				return u, nil
 			}
 			return nil, err
