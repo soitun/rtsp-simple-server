@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/bluenviron/gortsplib/v4/pkg/description"
-	mcmpegts "github.com/bluenviron/mediacommon/pkg/formats/mpegts"
-	"github.com/datarhei/gosrt"
+	mcmpegts "github.com/bluenviron/mediacommon/v2/pkg/formats/mpegts"
+	srt "github.com/datarhei/gosrt"
 
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
@@ -17,11 +17,11 @@ import (
 
 // Source is a SRT static source.
 type Source struct {
-	ReadTimeout conf.StringDuration
+	ReadTimeout conf.Duration
 	Parent      defs.StaticSourceParent
 }
 
-// Log implements StaticSource.
+// Log implements logger.Writer.
 func (s *Source) Log(level logger.Level, format string, args ...interface{}) {
 	s.Parent.Log(level, "[SRT source] "+format, args...)
 }
@@ -31,7 +31,7 @@ func (s *Source) Run(params defs.StaticSourceRunParams) error {
 	s.Log(logger.Debug, "connecting")
 
 	conf := srt.DefaultConfig()
-	address, err := conf.UnmarshalURL(params.Conf.Source)
+	address, err := conf.UnmarshalURL(params.ResolvedSource)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (s *Source) runReader(sconn srt.Conn) error {
 
 	var stream *stream.Stream
 
-	medias, err := mpegts.ToStream(r, &stream)
+	medias, err := mpegts.ToStream(r, &stream, s)
 	if err != nil {
 		return err
 	}

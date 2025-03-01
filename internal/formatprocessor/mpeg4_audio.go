@@ -1,6 +1,7 @@
 package formatprocessor
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,6 +17,7 @@ type formatProcessorMPEG4Audio struct {
 	format            *format.MPEG4Audio
 	encoder           *rtpmpeg4audio.Encoder
 	decoder           *rtpmpeg4audio.Decoder
+	randomStart       uint32
 }
 
 func newMPEG4Audio(
@@ -30,6 +32,11 @@ func newMPEG4Audio(
 
 	if generateRTPPackets {
 		err := t.createEncoder()
+		if err != nil {
+			return nil, err
+		}
+
+		t.randomStart, err = randUint32()
 		if err != nil {
 			return nil, err
 		}
@@ -56,13 +63,11 @@ func (t *formatProcessorMPEG4Audio) ProcessUnit(uu unit.Unit) error { //nolint:d
 	if err != nil {
 		return err
 	}
-
-	ts := uint32(multiplyAndDivide(u.PTS, time.Duration(t.format.ClockRate()), time.Second))
-	for _, pkt := range pkts {
-		pkt.Timestamp += ts
-	}
-
 	u.RTPPackets = pkts
+
+	for _, pkt := range u.RTPPackets {
+		pkt.Timestamp += t.randomStart + uint32(u.PTS)
+	}
 
 	return nil
 }
@@ -70,9 +75,9 @@ func (t *formatProcessorMPEG4Audio) ProcessUnit(uu unit.Unit) error { //nolint:d
 func (t *formatProcessorMPEG4Audio) ProcessRTPPacket( //nolint:dupl
 	pkt *rtp.Packet,
 	ntp time.Time,
-	pts time.Duration,
+	pts int64,
 	hasNonRTSPReaders bool,
-) (Unit, error) {
+) (unit.Unit, error) {
 	u := &unit.MPEG4Audio{
 		Base: unit.Base{
 			RTPPackets: []*rtp.Packet{pkt},
@@ -102,7 +107,7 @@ func (t *formatProcessorMPEG4Audio) ProcessRTPPacket( //nolint:dupl
 
 		aus, err := t.decoder.Decode(pkt)
 		if err != nil {
-			if err == rtpmpeg4audio.ErrMorePacketsNeeded {
+			if errors.Is(err, rtpmpeg4audio.ErrMorePacketsNeeded) {
 				return u, nil
 			}
 			return nil, err

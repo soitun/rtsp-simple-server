@@ -19,13 +19,11 @@ export DOCKERFILE_DOCKERHUB_FFMPEG
 
 define DOCKERFILE_DOCKERHUB_RPI_BASE_32
 FROM $(RPI32_IMAGE)
-RUN apt update && apt install -y --no-install-recommends libcamera0 libfreetype6 && rm -rf /var/lib/apt/lists/*
 endef
 export DOCKERFILE_DOCKERHUB_RPI_BASE_32
 
 define DOCKERFILE_DOCKERHUB_RPI_BASE_64
 FROM $(RPI64_IMAGE)
-RUN apt update && apt install -y --no-install-recommends libcamera0 libfreetype6 && rm -rf /var/lib/apt/lists/*
 endef
 export DOCKERFILE_DOCKERHUB_RPI_BASE_64
 
@@ -62,7 +60,7 @@ dockerhub:
 	cp binaries/*linux_arm64v8.tar.gz tmp/binaries/linux/arm64.tar.gz
 
 	docker buildx rm builder 2>/dev/null || true
-	rm -rf $$HOME/.docker/manifests/*
+	rm -rf "$$HOME/.docker/manifests"/*
 	docker buildx create --name=builder --use
 
 	echo "$$DOCKERFILE_DOCKERHUB_RPI_BASE_32" | docker buildx build . -f - \
@@ -105,4 +103,4 @@ dockerhub:
 	--push
 
 	docker buildx rm builder
-	rm -rf $$HOME/.docker/manifests/*
+	rm -rf "$$HOME/.docker/manifests"/*

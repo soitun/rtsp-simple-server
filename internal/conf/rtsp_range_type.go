@@ -3,6 +3,8 @@ package conf
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/bluenviron/mediamtx/internal/conf/jsonwrapper"
 )
 
 // RTSPRangeType is the type used in the Range header.
@@ -30,11 +32,8 @@ func (d RTSPRangeType) MarshalJSON() ([]byte, error) {
 	case RTSPRangeTypeSMPTE:
 		out = "smpte"
 
-	case RTSPRangeTypeUndefined:
-		out = ""
-
 	default:
-		return nil, fmt.Errorf("invalid rtsp range type: %v", d)
+		out = ""
 	}
 
 	return json.Marshal(out)
@@ -43,7 +42,7 @@ func (d RTSPRangeType) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements json.Unmarshaler.
 func (d *RTSPRangeType) UnmarshalJSON(b []byte) error {
 	var in string
-	if err := json.Unmarshal(b, &in); err != nil {
+	if err := jsonwrapper.Unmarshal(b, &in); err != nil {
 		return err
 	}
 

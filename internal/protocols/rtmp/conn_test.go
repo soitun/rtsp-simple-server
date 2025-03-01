@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/notedit/rtmp/format/flv/flvio"
 	"github.com/stretchr/testify/require"
 
+	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/amf0"
 	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/bytecounter"
 	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/handshake"
 	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/message"
@@ -28,78 +28,78 @@ func TestNewClientConn(t *testing.T) {
 			done := make(chan struct{})
 
 			go func() {
-				conn, err := ln.Accept()
-				require.NoError(t, err)
+				conn, err2 := ln.Accept()
+				require.NoError(t, err2)
 				defer conn.Close()
 				bc := bytecounter.NewReadWriter(conn)
 
-				_, _, err = handshake.DoServer(bc, false)
-				require.NoError(t, err)
+				_, _, err2 = handshake.DoServer(bc, false)
+				require.NoError(t, err2)
 
 				mrw := message.NewReadWriter(bc, bc, true)
 
-				msg, err := mrw.Read()
-				require.NoError(t, err)
+				msg, err2 := mrw.Read()
+				require.NoError(t, err2)
 				require.Equal(t, &message.SetWindowAckSize{
 					Value: 2500000,
 				}, msg)
 
-				msg, err = mrw.Read()
-				require.NoError(t, err)
+				msg, err2 = mrw.Read()
+				require.NoError(t, err2)
 				require.Equal(t, &message.SetPeerBandwidth{
 					Value: 2500000,
 					Type:  2,
 				}, msg)
 
-				msg, err = mrw.Read()
-				require.NoError(t, err)
+				msg, err2 = mrw.Read()
+				require.NoError(t, err2)
 				require.Equal(t, &message.SetChunkSize{
 					Value: 65536,
 				}, msg)
 
-				msg, err = mrw.Read()
-				require.NoError(t, err)
+				msg, err2 = mrw.Read()
+				require.NoError(t, err2)
 				require.Equal(t, &message.CommandAMF0{
 					ChunkStreamID: 3,
 					Name:          "connect",
 					CommandID:     1,
 					Arguments: []interface{}{
-						flvio.AMFMap{
-							{K: "app", V: "stream"},
-							{K: "flashVer", V: "LNX 9,0,124,2"},
-							{K: "tcUrl", V: "rtmp://127.0.0.1:9121/stream"},
-							{K: "fpad", V: false},
-							{K: "capabilities", V: float64(15)},
-							{K: "audioCodecs", V: float64(4071)},
-							{K: "videoCodecs", V: float64(252)},
-							{K: "videoFunction", V: float64(1)},
+						amf0.Object{
+							{Key: "app", Value: "stream"},
+							{Key: "flashVer", Value: "LNX 9,0,124,2"},
+							{Key: "tcUrl", Value: "rtmp://127.0.0.1:9121/stream"},
+							{Key: "fpad", Value: false},
+							{Key: "capabilities", Value: float64(15)},
+							{Key: "audioCodecs", Value: float64(4071)},
+							{Key: "videoCodecs", Value: float64(252)},
+							{Key: "videoFunction", Value: float64(1)},
 						},
 					},
 				}, msg)
 
-				err = mrw.Write(&message.CommandAMF0{
+				err2 = mrw.Write(&message.CommandAMF0{
 					ChunkStreamID: 3,
 					Name:          "_result",
 					CommandID:     1,
 					Arguments: []interface{}{
-						flvio.AMFMap{
-							{K: "fmsVer", V: "LNX 9,0,124,2"},
-							{K: "capabilities", V: float64(31)},
+						amf0.Object{
+							{Key: "fmsVer", Value: "LNX 9,0,124,2"},
+							{Key: "capabilities", Value: float64(31)},
 						},
-						flvio.AMFMap{
-							{K: "level", V: "status"},
-							{K: "code", V: "NetConnection.Connect.Success"},
-							{K: "description", V: "Connection succeeded."},
-							{K: "objectEncoding", V: float64(0)},
+						amf0.Object{
+							{Key: "level", Value: "status"},
+							{Key: "code", Value: "NetConnection.Connect.Success"},
+							{Key: "description", Value: "Connection succeeded."},
+							{Key: "objectEncoding", Value: float64(0)},
 						},
 					},
 				})
-				require.NoError(t, err)
+				require.NoError(t, err2)
 
 				switch ca {
 				case "read", "read nginx rtmp":
-					msg, err = mrw.Read()
-					require.NoError(t, err)
+					msg, err2 = mrw.Read()
+					require.NoError(t, err2)
 					require.Equal(t, &message.CommandAMF0{
 						ChunkStreamID: 3,
 						Name:          "createStream",
@@ -109,7 +109,7 @@ func TestNewClientConn(t *testing.T) {
 						},
 					}, msg)
 
-					err = mrw.Write(&message.CommandAMF0{
+					err2 = mrw.Write(&message.CommandAMF0{
 						ChunkStreamID: 3,
 						Name:          "_result",
 						CommandID:     2,
@@ -118,16 +118,16 @@ func TestNewClientConn(t *testing.T) {
 							float64(1),
 						},
 					})
-					require.NoError(t, err)
+					require.NoError(t, err2)
 
-					msg, err = mrw.Read()
-					require.NoError(t, err)
+					msg, err2 = mrw.Read()
+					require.NoError(t, err2)
 					require.Equal(t, &message.UserControlSetBufferLength{
 						BufferLength: 0x64,
 					}, msg)
 
-					msg, err = mrw.Read()
-					require.NoError(t, err)
+					msg, err2 = mrw.Read()
+					require.NoError(t, err2)
 					require.Equal(t, &message.CommandAMF0{
 						ChunkStreamID:   4,
 						MessageStreamID: 0x1000000,
@@ -139,7 +139,7 @@ func TestNewClientConn(t *testing.T) {
 						},
 					}, msg)
 
-					err = mrw.Write(&message.CommandAMF0{
+					err2 = mrw.Write(&message.CommandAMF0{
 						ChunkStreamID:   5,
 						MessageStreamID: 0x1000000,
 						Name:            "onStatus",
@@ -151,18 +151,18 @@ func TestNewClientConn(t *testing.T) {
 						}(),
 						Arguments: []interface{}{
 							nil,
-							flvio.AMFMap{
-								{K: "level", V: "status"},
-								{K: "code", V: "NetStream.Play.Reset"},
-								{K: "description", V: "play reset"},
+							amf0.Object{
+								{Key: "level", Value: "status"},
+								{Key: "code", Value: "NetStream.Play.Reset"},
+								{Key: "description", Value: "play reset"},
 							},
 						},
 					})
-					require.NoError(t, err)
+					require.NoError(t, err2)
 
 				case "publish":
-					msg, err = mrw.Read()
-					require.NoError(t, err)
+					msg, err2 = mrw.Read()
+					require.NoError(t, err2)
 					require.Equal(t, &message.CommandAMF0{
 						ChunkStreamID: 3,
 						Name:          "releaseStream",
@@ -173,8 +173,8 @@ func TestNewClientConn(t *testing.T) {
 						},
 					}, msg)
 
-					msg, err = mrw.Read()
-					require.NoError(t, err)
+					msg, err2 = mrw.Read()
+					require.NoError(t, err2)
 					require.Equal(t, &message.CommandAMF0{
 						ChunkStreamID: 3,
 						Name:          "FCPublish",
@@ -185,8 +185,8 @@ func TestNewClientConn(t *testing.T) {
 						},
 					}, msg)
 
-					msg, err = mrw.Read()
-					require.NoError(t, err)
+					msg, err2 = mrw.Read()
+					require.NoError(t, err2)
 					require.Equal(t, &message.CommandAMF0{
 						ChunkStreamID: 3,
 						Name:          "createStream",
@@ -196,7 +196,7 @@ func TestNewClientConn(t *testing.T) {
 						},
 					}, msg)
 
-					err = mrw.Write(&message.CommandAMF0{
+					err2 = mrw.Write(&message.CommandAMF0{
 						ChunkStreamID: 3,
 						Name:          "_result",
 						CommandID:     4,
@@ -205,10 +205,10 @@ func TestNewClientConn(t *testing.T) {
 							float64(1),
 						},
 					})
-					require.NoError(t, err)
+					require.NoError(t, err2)
 
-					msg, err = mrw.Read()
-					require.NoError(t, err)
+					msg, err2 = mrw.Read()
+					require.NoError(t, err2)
 					require.Equal(t, &message.CommandAMF0{
 						ChunkStreamID:   4,
 						MessageStreamID: 0x1000000,
@@ -221,21 +221,21 @@ func TestNewClientConn(t *testing.T) {
 						},
 					}, msg)
 
-					err = mrw.Write(&message.CommandAMF0{
+					err2 = mrw.Write(&message.CommandAMF0{
 						ChunkStreamID:   5,
 						MessageStreamID: 0x1000000,
 						Name:            "onStatus",
 						CommandID:       5,
 						Arguments: []interface{}{
 							nil,
-							flvio.AMFMap{
-								{K: "level", V: "status"},
-								{K: "code", V: "NetStream.Publish.Start"},
-								{K: "description", V: "publish start"},
+							amf0.Object{
+								{Key: "level", Value: "status"},
+								{Key: "code", Value: "NetStream.Publish.Start"},
+								{Key: "description", Value: "publish start"},
 							},
 						},
 					})
-					require.NoError(t, err)
+					require.NoError(t, err2)
 				}
 
 				close(done)
@@ -280,12 +280,12 @@ func TestNewServerConn(t *testing.T) {
 			done := make(chan struct{})
 
 			go func() {
-				nconn, err := ln.Accept()
-				require.NoError(t, err)
+				nconn, err2 := ln.Accept()
+				require.NoError(t, err2)
 				defer nconn.Close()
 
-				_, u, isPublishing, err := NewServerConn(nconn)
-				require.NoError(t, err)
+				_, u, isPublishing, err2 := NewServerConn(nconn)
+				require.NoError(t, err2)
 
 				require.Equal(t, &url.URL{
 					Scheme: "rtmp",
@@ -317,15 +317,15 @@ func TestNewServerConn(t *testing.T) {
 				Name:          "connect",
 				CommandID:     1,
 				Arguments: []interface{}{
-					flvio.AMFMap{
-						{K: "app", V: "/stream"},
-						{K: "flashVer", V: "LNX 9,0,124,2"},
-						{K: "tcUrl", V: tcURL},
-						{K: "fpad", V: false},
-						{K: "capabilities", V: 15},
-						{K: "audioCodecs", V: 4071},
-						{K: "videoCodecs", V: 252},
-						{K: "videoFunction", V: 1},
+					amf0.Object{
+						{Key: "app", Value: "/stream"},
+						{Key: "flashVer", Value: "LNX 9,0,124,2"},
+						{Key: "tcUrl", Value: tcURL},
+						{Key: "fpad", Value: false},
+						{Key: "capabilities", Value: float64(15)},
+						{Key: "audioCodecs", Value: float64(4071)},
+						{Key: "videoCodecs", Value: float64(252)},
+						{Key: "videoFunction", Value: float64(1)},
 					},
 				},
 			})
@@ -357,15 +357,15 @@ func TestNewServerConn(t *testing.T) {
 				Name:          "_result",
 				CommandID:     1,
 				Arguments: []interface{}{
-					flvio.AMFMap{
-						{K: "fmsVer", V: "LNX 9,0,124,2"},
-						{K: "capabilities", V: float64(31)},
+					amf0.Object{
+						{Key: "fmsVer", Value: "LNX 9,0,124,2"},
+						{Key: "capabilities", Value: float64(31)},
 					},
-					flvio.AMFMap{
-						{K: "level", V: "status"},
-						{K: "code", V: "NetConnection.Connect.Success"},
-						{K: "description", V: "Connection succeeded."},
-						{K: "objectEncoding", V: float64(0)},
+					amf0.Object{
+						{Key: "level", Value: "status"},
+						{Key: "code", Value: "NetConnection.Connect.Success"},
+						{Key: "description", Value: "Connection succeeded."},
+						{Key: "objectEncoding", Value: float64(0)},
 					},
 				},
 			}, msg)

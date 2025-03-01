@@ -4,33 +4,43 @@ import (
 	"time"
 
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
-	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
-	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg1audio"
-	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
-	"github.com/notedit/rtmp/format/flv/flvio"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg1audio"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4audio"
 
+	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/amf0"
 	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/h264conf"
 	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/message"
 )
 
-func mpeg1AudioRate(sr int) uint8 {
-	switch sr {
-	case 5500:
-		return flvio.SOUND_5_5Khz
-	case 11025:
-		return flvio.SOUND_11Khz
-	case 22050:
-		return flvio.SOUND_22Khz
+func audioRateRTMPToInt(v uint8) int {
+	switch v {
+	case message.Rate5512:
+		return 5512
+	case message.Rate11025:
+		return 11025
+	case message.Rate22050:
+		return 22050
 	default:
-		return flvio.SOUND_44Khz
+		return 44100
 	}
 }
 
-func mpeg1AudioChannels(m mpeg1audio.ChannelMode) uint8 {
-	if m == mpeg1audio.ChannelModeMono {
-		return flvio.SOUND_MONO
+func audioRateIntToRTMP(v int) uint8 {
+	switch v {
+	case 5512:
+		return message.Rate5512
+	case 11025:
+		return message.Rate11025
+	case 22050:
+		return message.Rate22050
+	default:
+		return message.Rate44100
 	}
-	return flvio.SOUND_STEREO
+}
+
+func mpeg1AudioChannels(m mpeg1audio.ChannelMode) bool {
+	return m != mpeg1audio.ChannelModeMono
 }
 
 // Writer is a wrapper around Conn that provides utilities to mux outgoing data.
@@ -59,14 +69,14 @@ func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format)
 		Payload: []interface{}{
 			"@setDataFrame",
 			"onMetaData",
-			flvio.AMFMap{
+			amf0.Object{
 				{
-					K: "videodatarate",
-					V: float64(0),
+					Key:   "videodatarate",
+					Value: float64(0),
 				},
 				{
-					K: "videocodecid",
-					V: func() float64 {
+					Key: "videocodecid",
+					Value: func() float64 {
 						switch videoTrack.(type) {
 						case *format.H264:
 							return message.CodecH264
@@ -77,12 +87,12 @@ func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format)
 					}(),
 				},
 				{
-					K: "audiodatarate",
-					V: float64(0),
+					Key:   "audiodatarate",
+					Value: float64(0),
 				},
 				{
-					K: "audiocodecid",
-					V: func() float64 {
+					Key: "audiocodecid",
+					Value: func() float64 {
 						switch audioTrack.(type) {
 						case *format.MPEG1Audio:
 							return message.CodecMPEG1Audio
@@ -141,9 +151,9 @@ func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format)
 			ChunkStreamID:   message.AudioChunkStreamID,
 			MessageStreamID: 0x1000000,
 			Codec:           message.CodecMPEG4Audio,
-			Rate:            flvio.SOUND_44Khz,
-			Depth:           flvio.SOUND_16BIT,
-			Channels:        flvio.SOUND_STEREO,
+			Rate:            message.Rate44100,
+			Depth:           message.Depth16,
+			IsStereo:        true,
 			AACType:         message.AudioAACTypeConfig,
 			Payload:         enc,
 		})
@@ -156,8 +166,8 @@ func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format)
 }
 
 // WriteH264 writes H264 data.
-func (w *Writer) WriteH264(pts time.Duration, dts time.Duration, idrPresent bool, au [][]byte) error {
-	avcc, err := h264.AVCCMarshal(au)
+func (w *Writer) WriteH264(pts time.Duration, dts time.Duration, au [][]byte) error {
+	avcc, err := h264.AVCC(au).Marshal()
 	if err != nil {
 		return err
 	}
@@ -166,7 +176,7 @@ func (w *Writer) WriteH264(pts time.Duration, dts time.Duration, idrPresent bool
 		ChunkStreamID:   message.VideoChunkStreamID,
 		MessageStreamID: 0x1000000,
 		Codec:           message.CodecH264,
-		IsKeyFrame:      idrPresent,
+		IsKeyFrame:      h264.IsRandomAccess(au),
 		Type:            message.VideoTypeAU,
 		Payload:         avcc,
 		DTS:             dts,
@@ -180,9 +190,9 @@ func (w *Writer) WriteMPEG4Audio(pts time.Duration, au []byte) error {
 		ChunkStreamID:   message.AudioChunkStreamID,
 		MessageStreamID: 0x1000000,
 		Codec:           message.CodecMPEG4Audio,
-		Rate:            flvio.SOUND_44Khz,
-		Depth:           flvio.SOUND_16BIT,
-		Channels:        flvio.SOUND_STEREO,
+		Rate:            message.Rate44100,
+		Depth:           message.Depth16,
+		IsStereo:        true,
 		AACType:         message.AudioAACTypeAU,
 		Payload:         au,
 		DTS:             pts,
@@ -195,9 +205,9 @@ func (w *Writer) WriteMPEG1Audio(pts time.Duration, h *mpeg1audio.FrameHeader, f
 		ChunkStreamID:   message.AudioChunkStreamID,
 		MessageStreamID: 0x1000000,
 		Codec:           message.CodecMPEG1Audio,
-		Rate:            mpeg1AudioRate(h.SampleRate),
-		Depth:           flvio.SOUND_16BIT,
-		Channels:        mpeg1AudioChannels(h.ChannelMode),
+		Rate:            audioRateIntToRTMP(h.SampleRate),
+		Depth:           message.Depth16,
+		IsStereo:        mpeg1AudioChannels(h.ChannelMode),
 		Payload:         frame,
 		DTS:             pts,
 	})
