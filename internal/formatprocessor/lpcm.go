@@ -16,6 +16,7 @@ type formatProcessorLPCM struct {
 	format            *format.LPCM
 	encoder           *rtplpcm.Encoder
 	decoder           *rtplpcm.Decoder
+	randomStart       uint32
 }
 
 func newLPCM(
@@ -33,6 +34,11 @@ func newLPCM(
 		if err != nil {
 			return nil, err
 		}
+
+		t.randomStart, err = randUint32()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return t, nil
@@ -41,6 +47,9 @@ func newLPCM(
 func (t *formatProcessorLPCM) createEncoder() error {
 	t.encoder = &rtplpcm.Encoder{
 		PayloadMaxSize: t.udpMaxPayloadSize - 12,
+		PayloadType:    t.format.PayloadTyp,
+		BitDepth:       t.format.BitDepth,
+		ChannelCount:   t.format.ChannelCount,
 	}
 	return t.encoder.Init()
 }
@@ -52,13 +61,11 @@ func (t *formatProcessorLPCM) ProcessUnit(uu unit.Unit) error { //nolint:dupl
 	if err != nil {
 		return err
 	}
-
-	ts := uint32(multiplyAndDivide(u.PTS, time.Duration(t.format.ClockRate()), time.Second))
-	for _, pkt := range pkts {
-		pkt.Timestamp += ts
-	}
-
 	u.RTPPackets = pkts
+
+	for _, pkt := range u.RTPPackets {
+		pkt.Timestamp += t.randomStart + uint32(u.PTS)
+	}
 
 	return nil
 }
@@ -66,9 +73,9 @@ func (t *formatProcessorLPCM) ProcessUnit(uu unit.Unit) error { //nolint:dupl
 func (t *formatProcessorLPCM) ProcessRTPPacket( //nolint:dupl
 	pkt *rtp.Packet,
 	ntp time.Time,
-	pts time.Duration,
+	pts int64,
 	hasNonRTSPReaders bool,
-) (Unit, error) {
+) (unit.Unit, error) {
 	u := &unit.LPCM{
 		Base: unit.Base{
 			RTPPackets: []*rtp.Packet{pkt},

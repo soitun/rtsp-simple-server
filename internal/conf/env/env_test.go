@@ -2,7 +2,6 @@ package env
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
@@ -17,7 +16,7 @@ func intPtr(v int) *int {
 	return &v
 }
 
-func uint64Ptr(v uint64) *uint64 {
+func uintPtr(v uint) *uint {
 	return &v
 }
 
@@ -76,8 +75,8 @@ type testStruct struct {
 	MyStringOpt              *string              `json:"myStringOpt"`
 	MyInt                    int                  `json:"myInt"`
 	MyIntOpt                 *int                 `json:"myIntOpt"`
-	MyUint                   uint64               `json:"myUint"`
-	MyUintOpt                *uint64              `json:"myUintOpt"`
+	MyUint                   uint                 `json:"myUint"`
+	MyUintOpt                *uint                `json:"myUintOpt"`
 	MyFloat                  float64              `json:"myFloat"`
 	MyFloatOpt               *float64             `json:"myFloatOpt"`
 	MyBool                   bool                 `json:"myBool"`
@@ -86,6 +85,7 @@ type testStruct struct {
 	MyDurationOpt            *myDuration          `json:"myDurationOpt"`
 	MyDurationOptUnset       *myDuration          `json:"myDurationOptUnset"`
 	MyMap                    map[string]*mapEntry `json:"myMap"`
+	MySliceFloat             []float64            `json:"mySliceFloat"`
 	MySliceString            []string             `json:"mySliceString"`
 	MySliceStringEmpty       []string             `json:"mySliceStringEmpty"`
 	MySliceStringOpt         *[]string            `json:"mySliceStringOpt"`
@@ -114,6 +114,7 @@ func TestLoad(t *testing.T) {
 		"MYPREFIX_MYMAP_MYKEY":                    "",
 		"MYPREFIX_MYMAP_MYKEY2_MYVALUE":           "asd",
 		"MYPREFIX_MYMAP_MYKEY2_MYSTRUCT_MYPARAM":  "456",
+		"MYPREFIX_MYSLICEFLOAT":                   "0.5,0.5",
 		"MYPREFIX_MYSLICESTRING":                  "val1,val2",
 		"MYPREFIX_MYSLICESTRINGEMPTY":             "",
 		"MYPREFIX_MYSLICESTRINGOPT":               "aa",
@@ -127,8 +128,7 @@ func TestLoad(t *testing.T) {
 	}
 
 	for key, val := range env {
-		os.Setenv(key, val)
-		defer os.Unsetenv(key)
+		t.Setenv(key, val)
 	}
 
 	var s testStruct
@@ -141,7 +141,7 @@ func TestLoad(t *testing.T) {
 		MyInt:         123,
 		MyIntOpt:      intPtr(456),
 		MyUint:        8910,
-		MyUintOpt:     uint64Ptr(112313),
+		MyUintOpt:     uintPtr(112313),
 		MyFloat:       15.2,
 		MyFloatOpt:    float64Ptr(16.2),
 		MyBool:        true,
@@ -162,6 +162,7 @@ func TestLoad(t *testing.T) {
 				},
 			},
 		},
+		MySliceFloat: []float64{0.5, 0.5},
 		MySliceString: []string{
 			"val1",
 			"val2",
@@ -193,7 +194,7 @@ func FuzzLoad(f *testing.F) {
 	f.Add("MYPREFIX_MYDURATION", "a")
 	f.Add("MYPREFIX_MYDURATION_A", "a")
 
-	f.Fuzz(func(t *testing.T, key string, val string) {
+	f.Fuzz(func(_ *testing.T, key string, val string) {
 		env := map[string]string{
 			key: val,
 		}

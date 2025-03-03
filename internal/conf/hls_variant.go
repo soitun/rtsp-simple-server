@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/bluenviron/gohlslib"
+	"github.com/bluenviron/gohlslib/v2"
+	"github.com/bluenviron/mediamtx/internal/conf/jsonwrapper"
 )
 
 // HLSVariant is the hlsVariant parameter.
@@ -21,11 +22,8 @@ func (d HLSVariant) MarshalJSON() ([]byte, error) {
 	case HLSVariant(gohlslib.MuxerVariantFMP4):
 		out = "fmp4"
 
-	case HLSVariant(gohlslib.MuxerVariantLowLatency):
-		out = "lowLatency"
-
 	default:
-		return nil, fmt.Errorf("invalid HLS variant: %v", d)
+		out = "lowLatency"
 	}
 
 	return json.Marshal(out)
@@ -34,7 +32,7 @@ func (d HLSVariant) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements json.Unmarshaler.
 func (d *HLSVariant) UnmarshalJSON(b []byte) error {
 	var in string
-	if err := json.Unmarshal(b, &in); err != nil {
+	if err := jsonwrapper.Unmarshal(b, &in); err != nil {
 		return err
 	}
 

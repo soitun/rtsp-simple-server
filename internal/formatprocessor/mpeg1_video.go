@@ -1,6 +1,7 @@
 package formatprocessor //nolint:dupl
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,11 +12,21 @@ import (
 	"github.com/bluenviron/mediamtx/internal/unit"
 )
 
+// MPEG-1 video related parameters
+var (
+	MPEG1VideoDefaultConfig = []byte{
+		0x00, 0x00, 0x01, 0xb3, 0x78, 0x04, 0x38, 0x35,
+		0xff, 0xff, 0xe0, 0x18, 0x00, 0x00, 0x01, 0xb5,
+		0x14, 0x4a, 0x00, 0x01, 0x00, 0x00,
+	}
+)
+
 type formatProcessorMPEG1Video struct {
 	udpMaxPayloadSize int
 	format            *format.MPEG1Video
 	encoder           *rtpmpeg1video.Encoder
 	decoder           *rtpmpeg1video.Decoder
+	randomStart       uint32
 }
 
 func newMPEG1Video(
@@ -30,6 +41,11 @@ func newMPEG1Video(
 
 	if generateRTPPackets {
 		err := t.createEncoder()
+		if err != nil {
+			return nil, err
+		}
+
+		t.randomStart, err = randUint32()
 		if err != nil {
 			return nil, err
 		}
@@ -53,13 +69,11 @@ func (t *formatProcessorMPEG1Video) ProcessUnit(uu unit.Unit) error { //nolint:d
 	if err != nil {
 		return err
 	}
-
-	ts := uint32(multiplyAndDivide(u.PTS, time.Duration(t.format.ClockRate()), time.Second))
-	for _, pkt := range pkts {
-		pkt.Timestamp += ts
-	}
-
 	u.RTPPackets = pkts
+
+	for _, pkt := range u.RTPPackets {
+		pkt.Timestamp += t.randomStart + uint32(u.PTS)
+	}
 
 	return nil
 }
@@ -67,9 +81,9 @@ func (t *formatProcessorMPEG1Video) ProcessUnit(uu unit.Unit) error { //nolint:d
 func (t *formatProcessorMPEG1Video) ProcessRTPPacket( //nolint:dupl
 	pkt *rtp.Packet,
 	ntp time.Time,
-	pts time.Duration,
+	pts int64,
 	hasNonRTSPReaders bool,
-) (Unit, error) {
+) (unit.Unit, error) {
 	u := &unit.MPEG1Video{
 		Base: unit.Base{
 			RTPPackets: []*rtp.Packet{pkt},
@@ -99,7 +113,8 @@ func (t *formatProcessorMPEG1Video) ProcessRTPPacket( //nolint:dupl
 
 		frame, err := t.decoder.Decode(pkt)
 		if err != nil {
-			if err == rtpmpeg1video.ErrNonStartingPacketAndNoPrevious || err == rtpmpeg1video.ErrMorePacketsNeeded {
+			if errors.Is(err, rtpmpeg1video.ErrNonStartingPacketAndNoPrevious) ||
+				errors.Is(err, rtpmpeg1video.ErrMorePacketsNeeded) {
 				return u, nil
 			}
 			return nil, err

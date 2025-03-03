@@ -10,14 +10,6 @@ import (
 	"github.com/bluenviron/mediamtx/internal/unit"
 )
 
-// avoid an int64 overflow and preserve resolution by splitting division into two parts:
-// first add the integer part, then the decimal part.
-func multiplyAndDivide(v, m, d time.Duration) time.Duration {
-	secs := v / d
-	dec := v % d
-	return (secs*m + dec*m/d)
-}
-
 // Processor cleans and normalizes streams.
 type Processor interface {
 	// process a Unit.
@@ -27,9 +19,9 @@ type Processor interface {
 	ProcessRTPPacket(
 		pkt *rtp.Packet,
 		ntp time.Time,
-		pts time.Duration,
+		pts int64,
 		hasNonRTSPReaders bool,
-	) (Unit, error)
+	) (unit.Unit, error)
 }
 
 // New allocates a Processor.
@@ -74,6 +66,9 @@ func New(
 
 	case *format.AC3:
 		return newAC3(udpMaxPayloadSize, forma, generateRTPPackets)
+
+	case *format.G711:
+		return newG711(udpMaxPayloadSize, forma, generateRTPPackets)
 
 	case *format.LPCM:
 		return newLPCM(udpMaxPayloadSize, forma, generateRTPPackets)

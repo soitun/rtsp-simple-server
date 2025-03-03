@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
-	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
-	"github.com/notedit/rtmp/format/flv/flvio"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4audio"
 	"github.com/stretchr/testify/require"
 
+	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/amf0"
 	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/bytecounter"
 	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/message"
 )
@@ -56,11 +56,11 @@ func TestWriteTracks(t *testing.T) {
 		Payload: []interface{}{
 			"@setDataFrame",
 			"onMetaData",
-			flvio.AMFMap{
-				{K: "videodatarate", V: float64(0)},
-				{K: "videocodecid", V: float64(7)},
-				{K: "audiodatarate", V: float64(0)},
-				{K: "audiocodecid", V: float64(10)},
+			amf0.Object{
+				{Key: "videodatarate", Value: float64(0)},
+				{Key: "videocodecid", Value: float64(7)},
+				{Key: "audiodatarate", Value: float64(0)},
+				{Key: "audiocodecid", Value: float64(10)},
 			},
 		},
 	}, msg)
@@ -89,9 +89,9 @@ func TestWriteTracks(t *testing.T) {
 		ChunkStreamID:   message.AudioChunkStreamID,
 		MessageStreamID: 0x1000000,
 		Codec:           message.CodecMPEG4Audio,
-		Rate:            flvio.SOUND_44Khz,
-		Depth:           flvio.SOUND_16BIT,
-		Channels:        flvio.SOUND_STEREO,
+		Rate:            message.Rate44100,
+		Depth:           message.Depth16,
+		IsStereo:        true,
 		AACType:         message.AudioAACTypeConfig,
 		Payload:         []byte{0x12, 0x10},
 	}, msg)
