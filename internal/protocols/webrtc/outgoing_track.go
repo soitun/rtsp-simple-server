@@ -1,137 +1,53 @@
 package webrtc
 
 import (
-	"fmt"
+	"strings"
 
-	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
-type addTrackFunc func(webrtc.TrackLocal) (*webrtc.RTPSender, error)
+var multichannelOpusSDP = map[int]string{
+	3: "channel_mapping=0,2,1;num_streams=2;coupled_streams=1",
+	4: "channel_mapping=0,1,2,3;num_streams=2;coupled_streams=2",
+	5: "channel_mapping=0,4,1,2,3;num_streams=3;coupled_streams=2",
+	6: "channel_mapping=0,4,1,2,3,5;num_streams=4;coupled_streams=2",
+	7: "channel_mapping=0,4,1,2,3,5,6;num_streams=4;coupled_streams=4",
+	8: "channel_mapping=0,6,1,4,5,2,3,7;num_streams=5;coupled_streams=4",
+}
 
 // OutgoingTrack is a WebRTC outgoing track
 type OutgoingTrack struct {
+	Caps webrtc.RTPCodecCapability
+
 	track *webrtc.TrackLocalStaticRTP
 }
 
-func newOutgoingTrack(forma format.Format, addTrack addTrackFunc) (*OutgoingTrack, error) {
-	t := &OutgoingTrack{}
+func (t *OutgoingTrack) isVideo() bool {
+	return strings.Split(t.Caps.MimeType, "/")[0] == "video"
+}
 
-	switch forma := forma.(type) {
-	case *format.AV1:
-		var err error
-		t.track, err = webrtc.NewTrackLocalStaticRTP(
-			webrtc.RTPCodecCapability{
-				MimeType:  webrtc.MimeTypeAV1,
-				ClockRate: 90000,
-			},
-			"av1",
-			webrtcStreamID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-	case *format.VP9:
-		var err error
-		t.track, err = webrtc.NewTrackLocalStaticRTP(
-			webrtc.RTPCodecCapability{
-				MimeType:  webrtc.MimeTypeVP9,
-				ClockRate: uint32(forma.ClockRate()),
-			},
-			"vp9",
-			webrtcStreamID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-	case *format.VP8:
-		var err error
-		t.track, err = webrtc.NewTrackLocalStaticRTP(
-			webrtc.RTPCodecCapability{
-				MimeType:  webrtc.MimeTypeVP8,
-				ClockRate: uint32(forma.ClockRate()),
-			},
-			"vp8",
-			webrtcStreamID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-	case *format.H264:
-		var err error
-		t.track, err = webrtc.NewTrackLocalStaticRTP(
-			webrtc.RTPCodecCapability{
-				MimeType:  webrtc.MimeTypeH264,
-				ClockRate: uint32(forma.ClockRate()),
-			},
-			"h264",
-			webrtcStreamID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-	case *format.Opus:
-		var err error
-		t.track, err = webrtc.NewTrackLocalStaticRTP(
-			webrtc.RTPCodecCapability{
-				MimeType:  webrtc.MimeTypeOpus,
-				ClockRate: uint32(forma.ClockRate()),
-				Channels:  2,
-			},
-			"opus",
-			webrtcStreamID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-	case *format.G722:
-		var err error
-		t.track, err = webrtc.NewTrackLocalStaticRTP(
-			webrtc.RTPCodecCapability{
-				MimeType:  webrtc.MimeTypeG722,
-				ClockRate: uint32(forma.ClockRate()),
-			},
-			"g722",
-			webrtcStreamID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-	case *format.G711:
-		var mtyp string
-		if forma.MULaw {
-			mtyp = webrtc.MimeTypePCMU
-		} else {
-			mtyp = webrtc.MimeTypePCMA
-		}
-
-		var err error
-		t.track, err = webrtc.NewTrackLocalStaticRTP(
-			webrtc.RTPCodecCapability{
-				MimeType:  mtyp,
-				ClockRate: uint32(forma.ClockRate()),
-			},
-			"g711",
-			webrtcStreamID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-	default:
-		return nil, fmt.Errorf("unsupported track type: %T", forma)
+func (t *OutgoingTrack) setup(p *PeerConnection) error {
+	var trackID string
+	if t.isVideo() {
+		trackID = "video"
+	} else {
+		trackID = "audio"
 	}
 
-	sender, err := addTrack(t.track)
+	var err error
+	t.track, err = webrtc.NewTrackLocalStaticRTP(
+		t.Caps,
+		trackID,
+		webrtcStreamID,
+	)
 	if err != nil {
-		return nil, err
+		return err
+	}
+
+	sender, err := p.wr.AddTrack(t.track)
+	if err != nil {
+		return err
 	}
 
 	// read incoming RTCP packets to make interceptors work
@@ -145,7 +61,7 @@ func newOutgoingTrack(forma format.Format, addTrack addTrackFunc) (*OutgoingTrac
 		}
 	}()
 
-	return t, nil
+	return nil
 }
 
 // WriteRTP writes a RTP packet.

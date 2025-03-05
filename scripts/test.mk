@@ -1,9 +1,9 @@
-LBITS := $(shell getconf LONG_BIT)
-ifeq ($(LBITS),64)
-RACE=-race
+ifeq ($(shell getconf LONG_BIT),64)
+  RACE=-race
 endif
 
 test-internal:
+	go generate ./...
 	go test -v $(RACE) -coverprofile=coverage-internal.txt \
 	$$(go list ./internal/... | grep -v /core)
 
@@ -25,13 +25,13 @@ export DOCKERFILE_TEST
 test:
 	echo "$$DOCKERFILE_TEST" | docker build -q . -f - -t temp --build-arg ARCH=amd64
 	docker run --rm \
-	-v $(PWD):/s \
+	-v "$(shell pwd):/s" \
 	temp \
 	make test-nodocker
 
 test32:
 	echo "$$DOCKERFILE_TEST" | docker build -q . -f - -t temp --build-arg ARCH=i386
 	docker run --rm \
-	-v $(PWD):/s \
+	-v "$(shell pwd):/s" \
 	temp \
 	make test-nodocker

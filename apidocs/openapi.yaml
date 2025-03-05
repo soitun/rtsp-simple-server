@@ -21,6 +21,30 @@ components:
         error:
           type: string
 
+    AuthInternalUser:
+      type: object
+      properties:
+        user:
+          type: string
+        pass:
+          type: string
+        ips:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthInternalUserPermission'
+
+    AuthInternalUserPermission:
+      type: object
+      properties:
+        action:
+          type: string
+        path:
+          type: string
+
     GlobalConf:
       type: object
       properties:
@@ -41,20 +65,6 @@ components:
           type: integer
         udpMaxPayloadSize:
           type: integer
-        externalAuthenticationURL:
-          type: string
-        api:
-          type: boolean
-        apiAddress:
-          type: string
-        metrics:
-          type: boolean
-        metricsAddress:
-          type: string
-        pprof:
-          type: boolean
-        pprofAddress:
-          type: string
         runOnConnect:
           type: string
         runOnConnectRestart:
@@ -62,14 +72,104 @@ components:
         runOnDisconnect:
           type: string
 
-        # RTSP
-        rtsp:
+        # Authentication
+        authMethod:
+          type: string
+        authInternalUsers:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthInternalUser'
+        authHTTPAddress:
+          type: string
+        authHTTPExclude:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthInternalUserPermission'
+        authJWTJWKS:
+          type: string
+        authJWTClaimKey:
+          type: string
+
+        # Control API
+        api:
           type: boolean
-        protocols:
+        apiAddress:
+          type: string
+        apiEncryption:
+          type: boolean
+        apiServerKey:
+          type: string
+        apiServerCert:
+          type: string
+        apiAllowOrigin:
+          type: string
+        apiTrustedProxies:
           type: array
           items:
             type: string
-        encryption:
+
+        # Metrics
+        metrics:
+          type: boolean
+        metricsAddress:
+          type: string
+        metricsEncryption:
+          type: boolean
+        metricsServerKey:
+          type: string
+        metricsServerCert:
+          type: string
+        metricsAllowOrigin:
+          type: string
+        metricsTrustedProxies:
+          type: array
+          items:
+            type: string
+
+        # PPROF
+        pprof:
+          type: boolean
+        pprofAddress:
+          type: string
+        pprofEncryption:
+          type: boolean
+        pprofServerKey:
+          type: string
+        pprofServerCert:
+          type: string
+        pprofAllowOrigin:
+          type: string
+        pprofTrustedProxies:
+          type: array
+          items:
+            type: string
+
+        # Playback server
+        playback:
+          type: boolean
+        playbackAddress:
+          type: string
+        playbackEncryption:
+          type: boolean
+        playbackServerKey:
+          type: string
+        playbackServerCert:
+          type: string
+        playbackAllowOrigin:
+          type: string
+        playbackTrustedProxies:
+          type: array
+          items:
+            type: string
+
+        # RTSP server
+        rtsp:
+          type: boolean
+        rtspTransports:
+          type: array
+          items:
+            type: string
+        rtspEncryption:
           type: string
         rtspAddress:
           type: string
@@ -85,16 +185,16 @@ components:
           type: integer
         multicastRTCPPort:
           type: integer
-        serverKey:
+        rtspServerKey:
           type: string
-        serverCert:
+        rtspServerCert:
           type: string
-        authMethods:
+        rtspAuthMethods:
           type: array
           items:
             type: string
 
-        # RTMP
+        # RTMP server
         rtmp:
           type: boolean
         rtmpAddress:
@@ -108,7 +208,7 @@ components:
         rtmpServerCert:
           type: string
 
-        # HLS
+        # HLS server
         hls:
           type: boolean
         hlsAddress:
@@ -119,6 +219,12 @@ components:
           type: string
         hlsServerCert:
           type: string
+        hlsAllowOrigin:
+          type: string
+        hlsTrustedProxies:
+          type: array
+          items:
+            type: string
         hlsAlwaysRemux:
           type: boolean
         hlsVariant:
@@ -131,16 +237,12 @@ components:
           type: string
         hlsSegmentMaxSize:
           type: string
-        hlsAllowOrigin:
-          type: string
-        hlsTrustedProxies:
-          type: array
-          items:
-            type: string
         hlsDirectory:
           type: string
+        hlsMuxerCloseAfter:
+          type: string
 
-        # WebRTC
+        # WebRTC server
         webrtc:
           type: boolean
         webrtcAddress:
@@ -157,6 +259,20 @@ components:
           type: array
           items:
             type: string
+        webrtcLocalUDPAddress:
+          type: string
+        webrtcLocalTCPAddress:
+          type: string
+        webrtcIPsFromInterfaces:
+          type: boolean
+        webrtcIPsFromInterfacesList:
+          type: array
+          items:
+            type: string
+        webrtcAdditionalHosts:
+          type: array
+          items:
+            type: string
         webrtcICEServers2:
           type: array
           items:
@@ -168,37 +284,19 @@ components:
                 type: string
               password:
                 type: string
-        webrtcICEInterfaces:
-          type: array
-          items:
-            type: string
-        webrtcICEHostNAT1To1IPs:
-          type: array
-          items:
-            type: string
-        webrtcICEUDPMuxAddress:
+              clientOnly:
+                type: boolean
+        webrtcHandshakeTimeout:
           type: string
-        webrtcICETCPMuxAddress:
+        webrtcTrackGatherTimeout:
+          type: string
+        webrtcSTUNGatherTimeout:
           type: string
 
-        # SRT
+        # SRT server
         srt:
           type: boolean
         srtAddress:
-          type: string
-
-        # Record
-        record:
-          type: boolean
-        recordPath:
-          type: string
-        recordFormat:
-          type: string
-        recordPartDuration:
-          type: string
-        recordSegmentDuration:
-          type: string
-        recordDeleteAfter:
           type: string
 
     PathConf:
@@ -222,32 +320,26 @@ components:
           type: integer
         srtReadPassphrase:
           type: string
+        fallback:
+          type: string
+
+        # Record
         record:
           type: boolean
-
-        # Authentication
-        publishUser:
+        recordPath:
           type: string
-        publishPass:
+        recordFormat:
           type: string
-        publishIPs:
-          type: array
-          items:
-            type: string
-        readUser:
+        recordPartDuration:
           type: string
-        readPass:
+        recordSegmentDuration:
           type: string
-        readIPs:
-          type: array
-          items:
-            type: string
+        recordDeleteAfter:
+          type: string
 
         # Publisher source
         overridePublisher:
           type: boolean
-        fallback:
-          type: string
         srtPublishPassphrase:
           type: string
 
@@ -288,6 +380,12 @@ components:
           type: string
         rpiCameraAWB:
           type: string
+        rpiCameraAWBGains:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: number
         rpiCameraDenoise:
           type: string
         rpiCameraShutter:
@@ -308,14 +406,6 @@ components:
           type: string
         rpiCameraFPS:
           type: number
-        rpiCameraIDRPeriod:
-          type: integer
-        rpiCameraBitrate:
-          type: integer
-        rpiCameraProfile:
-          type: string
-        rpiCameraLevel:
-          type: string
         rpiCameraAfMode:
           type: string
         rpiCameraAfRange:
@@ -326,9 +416,21 @@ components:
           type: number
         rpiCameraAfWindow:
           type: string
+        rpiCameraFlickerPeriod:
+          type: integer
         rpiCameraTextOverlayEnable:
           type: boolean
         rpiCameraTextOverlay:
+          type: string
+        rpiCameraCodec:
+          type: string
+        rpiCameraIDRPeriod:
+          type: integer
+        rpiCameraBitrate:
+          type: integer
+        rpiCameraProfile:
+          type: string
+        rpiCameraLevel:
           type: string
 
         # Hooks
@@ -367,6 +469,8 @@ components:
       type: object
       properties:
         pageCount:
+          type: integer
+        itemCount:
           type: integer
         items:
           type: array
@@ -407,6 +511,8 @@ components:
       type: object
       properties:
         pageCount:
+          type: integer
+        itemCount:
           type: integer
         items:
           type: array
@@ -468,10 +574,40 @@ components:
       properties:
         pageCount:
           type: integer
+        itemCount:
+          type: integer
         items:
           type: array
           items:
             $ref: '#/components/schemas/HLSMuxer'
+
+    Recording:
+      type: object
+      properties:
+        name:
+          type: string
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecordingSegment'
+
+    RecordingList:
+      type: object
+      properties:
+        pageCount:
+          type: integer
+        itemCount:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Recording'
+
+    RecordingSegment:
+      type: object
+      properties:
+        start:
+          type: string
 
     RTMPConn:
       type: object
@@ -487,6 +623,8 @@ components:
           enum: [idle, read, publish]
         path:
           type: string
+        query:
+          type: string
         bytesReceived:
           type: integer
           format: int64
@@ -498,6 +636,8 @@ components:
       type: object
       properties:
         pageCount:
+          type: integer
+        itemCount:
           type: integer
         items:
           type: array
@@ -519,11 +659,16 @@ components:
         bytesSent:
           type: integer
           format: int64
+        session:
+          type: string
+          nullable: true
 
     RTSPConnList:
       type: object
       properties:
         pageCount:
+          type: integer
+        itemCount:
           type: integer
         items:
           type: array
@@ -544,6 +689,8 @@ components:
           enum: [idle, read, publish]
         path:
           type: string
+        query:
+          type: string
         transport:
           type: string
           nullable: true
@@ -553,11 +700,37 @@ components:
         bytesSent:
           type: integer
           format: int64
+        rtpPacketsReceived:
+          type: integer
+          format: int64
+        rtpPacketsSent:
+          type: integer
+          format: int64
+        rtpPacketsLost:
+          type: integer
+          format: int64
+        rtpPacketsInError:
+          type: integer
+          format: int64
+        rtpPacketsJitter:
+          type: number
+          format: float64
+        rtcpPacketsReceived:
+          type: integer
+          format: int64
+        rtcpPacketsSent:
+          type: integer
+          format: int64
+        rtcpPacketsInError:
+          type: integer
+          format: int64
 
     RTSPSessionList:
       type: object
       properties:
         pageCount:
+          type: integer
+        itemCount:
           type: integer
         items:
           type: array
@@ -578,17 +751,225 @@ components:
           enum: [idle, read, publish]
         path:
           type: string
-        bytesReceived:
+        query:
+          type: string
+        packetsSent:
           type: integer
           format: int64
+          description: The total number of sent DATA packets, including retransmitted packets
+        packetsReceived:
+          type: integer
+          format: int64
+          description: The total number of received DATA packets, including retransmitted packets
+        packetsReceivedBelated:
+          type: integer
+          format: int64
+        packetsSentUnique:
+          type: integer
+          format: int64
+          description: The total number of unique DATA packets sent by the SRT sender
+        packetsReceivedUnique:
+          type: integer
+          format: int64
+          description: The total number of unique original, retransmitted or recovered by the packet filter DATA packets received in time, decrypted without errors and, as a result, scheduled for delivery to the upstream application by the SRT receiver.
+        packetsSendLoss:
+          type: integer
+          format: int64
+          description: The total number of data packets considered or reported as lost at the sender side. Does not correspond to the packets detected as lost at the receiver side.
+        packetsReceivedLoss:
+          type: integer
+          format: int64
+          description: The total number of SRT DATA packets detected as presently missing (either reordered or lost) at the receiver side
+        packetsRetrans:
+          type: integer
+          format: int64
+          description: The total number of retransmitted packets sent by the SRT sender
+        packetsReceivedRetrans:
+          type: integer
+          format: int64
+          description: The total number of retransmitted packets registered at the receiver side
+        packetsSentACK:
+          type: integer
+          format: int64
+          description: The total number of sent ACK (Acknowledgement) control packets
+        packetsReceivedACK:
+          type: integer
+          format: int64
+          description: The total number of received ACK (Acknowledgement) control packets
+        packetsSentNAK:
+          type: integer
+          format: int64
+          description: The total number of sent NAK (Negative Acknowledgement) control packets
+        packetsReceivedNAK:
+          type: integer
+          format: int64
+          description: The total number of received NAK (Negative Acknowledgement) control packets
+        packetsSentKM:
+          type: integer
+          format: int64
+          description: The total number of sent KM (Key Material) control packets
+        packetsReceivedKM:
+          type: integer
+          format: int64
+          description: The total number of received KM (Key Material) control packets
+        usSndDuration:
+          type: integer
+          format: int64
+          description: The total accumulated time in microseconds, during which the SRT sender has some data to transmit, including packets that have been sent, but not yet acknowledged
+        packetsSendDrop:
+          type: integer
+          format: int64
+          description: The total number of dropped by the SRT sender DATA packets that have no chance to be delivered in time
+        packetsReceivedDrop:
+          type: integer
+          format: int64
+          description: The total number of dropped by the SRT receiver and, as a result, not delivered to the upstream application DATA packets
+        packetsReceivedUndecrypt:
+          type: integer
+          format: int64
+          description: The total number of packets that failed to be decrypted at the receiver side
         bytesSent:
           type: integer
           format: int64
+          description: Same as packetsSent, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
+        bytesReceived:
+          type: integer
+          format: int64
+          description: Same as packetsReceived, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
+        bytesReceivedBelated:
+          type: integer
+          format: int64
+        bytesSentUnique:
+          type: integer
+          format: int64
+          description: Same as packetsSentUnique, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
+        bytesReceivedUnique:
+          type: integer
+          format: int64
+          description: Same as packetsReceivedUnique, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
+        bytesReceivedLoss:
+          type: integer
+          format: int64
+          description: Same as packetsReceivedLoss, but expressed in bytes, including payload and all the headers (IP, TCP, SRT), bytes for the presently missing (either reordered or lost) packets' payloads are estimated based on the average packet size
+        bytesRetrans:
+          type: integer
+          format: int64
+          description: Same as packetsRetrans, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
+        bytesReceivedRetrans:
+          type: integer
+          format: int64
+          description: Same as packetsReceivedRetrans, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
+        bytesSendDrop:
+          type: integer
+          format: int64
+          description: Same as packetsSendDrop, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
+        bytesReceivedDrop:
+          type: integer
+          format: int64
+          description: Same as packetsReceivedDrop, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
+        bytesReceivedUndecrypt:
+          type: integer
+          format: int64
+          description: Same as packetsReceivedUndecrypt, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
+        usPacketsSendPeriod:
+          type: number
+          format: float64
+          description: Current minimum time interval between which consecutive packets are sent, in microseconds
+        packetsFlowWindow:
+          type: integer
+          format: int64
+          description: The maximum number of packets that can be "in flight"
+        packetsFlightSize:
+          type: integer
+          format: int64
+          description: The number of packets in flight
+        msRTT:
+          type: number
+          format: float64
+          description: Smoothed round-trip time (SRTT), an exponentially-weighted moving average (EWMA) of an endpoint's RTT samples, in milliseconds
+        mbpsSendRate:
+          type: number
+          format: float64
+          description: Current transmission bandwidth, in Mbps
+        mbpsReceiveRate:
+          type: number
+          format: float64
+          description: Current receiving bandwidth, in Mbps
+        mbpsLinkCapacity:
+          type: number
+          format: float64
+          description: Estimated capacity of the network link, in Mbps
+        bytesAvailSendBuf:
+          type: integer
+          format: int64
+          description: The available space in the sender's buffer, in bytes
+        bytesAvailReceiveBuf:
+          type: integer
+          format: int64
+          description: The available space in the receiver's buffer, in bytes
+        mbpsMaxBW:
+          type: number
+          format: float64
+          description: Transmission bandwidth limit, in Mbps
+        byteMSS:
+          type: integer
+          format: int64
+          description: Maximum Segment Size (MSS), in bytes
+        packetsSendBuf:
+          type: integer
+          format: int64
+          description: The number of packets in the sender's buffer that are already scheduled for sending or even possibly sent, but not yet acknowledged
+        bytesSendBuf:
+          type: integer
+          format: int64
+          description: Instantaneous (current) value of packetsSndBuf, but expressed in bytes, including payload and all headers (IP, TCP, SRT)
+        msSendBuf:
+          type: integer
+          format: int64
+          description: The timespan (msec) of packets in the sender's buffer (unacknowledged packets)
+        msSendTsbPdDelay:
+          type: integer
+          format: int64
+          description: Timestamp-based Packet Delivery Delay value of the peer
+        packetsReceiveBuf:
+          type: integer
+          format: int64
+          description: The number of acknowledged packets in receiver's buffer
+        bytesReceiveBuf:
+          type: integer
+          format: int64
+          description: Instantaneous (current) value of packetsRcvBuf, expressed in bytes, including payload and all headers (IP, TCP, SRT)
+        msReceiveBuf:
+          type: integer
+          format: int64
+          description: The timespan (msec) of acknowledged packets in the receiver's buffer
+        msReceiveTsbPdDelay:
+          type: integer
+          format: int64
+          description: Timestamp-based Packet Delivery Delay value set on the socket via SRTO_RCVLATENCY or SRTO_LATENCY
+        packetsReorderTolerance:
+          type: integer
+          format: int64
+          description: Instant value of the packet reorder tolerance
+        packetsReceivedAvgBelatedTime:
+          type: integer
+          format: int64
+          description: Accumulated difference between the current time and the time-to-play of a packet that is received late
+        packetsSendLossRate:
+          type: number
+          format: float64
+          description: Percentage of resent data vs. sent data
+        packetsReceivedLossRate:
+          type: number
+          format: float64
+          description: Percentage of retransmitted data vs. received data
 
     SRTConnList:
       type: object
       properties:
         pageCount:
+          type: integer
+        itemCount:
           type: integer
         items:
           type: array
@@ -615,6 +996,8 @@ components:
           enum: [read, publish]
         path:
           type: string
+        query:
+          type: string
         bytesReceived:
           type: integer
           format: int64
@@ -627,6 +1010,8 @@ components:
       properties:
         pageCount:
           type: integer
+        itemCount:
+          type: integer
         items:
           type: array
           items:
@@ -636,6 +1021,7 @@ paths:
   /v3/config/global/get:
     get:
       operationId: configGlobalGet
+      tags: [Configuration]
       summary: returns the global configuration.
       description: ''
       responses:
@@ -661,6 +1047,7 @@ paths:
   /v3/config/global/patch:
     patch:
       operationId: configGlobalSet
+      tags: [Configuration]
       summary: patches the global configuration.
       description: all fields are optional.
       requestBody:
@@ -688,6 +1075,7 @@ paths:
   /v3/config/pathdefaults/get:
     get:
       operationId: configPathDefaultsGet
+      tags: [Configuration]
       summary: returns the default path configuration.
       description: ''
       responses:
@@ -713,6 +1101,7 @@ paths:
   /v3/config/pathdefaults/patch:
     patch:
       operationId: configPathDefaultsPatch
+      tags: [Configuration]
       summary: patches the default path configuration.
       description: all fields are optional.
       requestBody:
@@ -740,6 +1129,7 @@ paths:
   /v3/config/paths/list:
     get:
       operationId: configPathsList
+      tags: [Configuration]
       summary: returns all path configurations.
       description: ''
       parameters:
@@ -778,6 +1168,7 @@ paths:
   /v3/config/paths/get/{name}:
     get:
       operationId: configPathsGet
+      tags: [Configuration]
       summary: returns a path configuration.
       description: ''
       parameters:
@@ -800,6 +1191,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: path not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -810,6 +1207,7 @@ paths:
   /v3/config/paths/add/{name}:
     post:
       operationId: configPathsAdd
+      tags: [Configuration]
       summary: adds a path configuration.
       description: all fields are optional.
       parameters:
@@ -844,6 +1242,7 @@ paths:
   /v3/config/paths/patch/{name}:
     patch:
       operationId: configPathsPatch
+      tags: [Configuration]
       summary: patches a path configuration.
       description: all fields are optional.
       parameters:
@@ -868,6 +1267,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: path not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -878,6 +1283,7 @@ paths:
   /v3/config/paths/replace/{name}:
     post:
       operationId: configPathsReplace
+      tags: [Configuration]
       summary: replaces all values of a path configuration.
       description: all fields are optional.
       parameters:
@@ -902,6 +1308,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: path not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -912,6 +1324,7 @@ paths:
   /v3/config/paths/delete/{name}:
     delete:
       operationId: configPathsDelete
+      tags: [Configuration]
       summary: removes a path configuration.
       description: ''
       parameters:
@@ -930,6 +1343,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: path not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -940,6 +1359,7 @@ paths:
   /v3/hlsmuxers/list:
     get:
       operationId: hlsMuxersList
+      tags: [HLS]
       summary: returns all HLS muxers.
       description: ''
       parameters:
@@ -978,6 +1398,7 @@ paths:
   /v3/hlsmuxers/get/{name}:
     get:
       operationId: hlsMuxersGet
+      tags: [HLS]
       summary: returns a HLS muxer.
       description: ''
       parameters:
@@ -1000,6 +1421,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: muxer not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1010,6 +1437,7 @@ paths:
   /v3/paths/list:
     get:
       operationId: pathsList
+      tags: [Paths]
       summary: returns all paths.
       description: ''
       parameters:
@@ -1048,6 +1476,7 @@ paths:
   /v3/paths/get/{name}:
     get:
       operationId: pathsGet
+      tags: [Paths]
       summary: returns a path.
       description: ''
       parameters:
@@ -1070,6 +1499,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: path not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1080,6 +1515,7 @@ paths:
   /v3/rtspconns/list:
     get:
       operationId: rtspConnsList
+      tags: [RTSP]
       summary: returns all RTSP connections.
       description: ''
       parameters:
@@ -1118,6 +1554,7 @@ paths:
   /v3/rtspconns/get/{id}:
     get:
       operationId: rtspConnsGet
+      tags: [RTSP]
       summary: returns a RTSP connection.
       description: ''
       parameters:
@@ -1140,6 +1577,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1150,6 +1593,7 @@ paths:
   /v3/rtspsessions/list:
     get:
       operationId: rtspSessionsList
+      tags: [RTSP]
       summary: returns all RTSP sessions.
       description: ''
       parameters:
@@ -1188,6 +1632,7 @@ paths:
   /v3/rtspsessions/get/{id}:
     get:
       operationId: rtspSessionsGet
+      tags: [RTSP]
       summary: returns a RTSP session.
       description: ''
       parameters:
@@ -1210,6 +1655,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: session not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1220,6 +1671,7 @@ paths:
   /v3/rtspsessions/kick/{id}:
     post:
       operationId: rtspSessionsKick
+      tags: [RTSP]
       summary: kicks out a RTSP session from the server.
       description: ''
       parameters:
@@ -1238,6 +1690,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: session not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1248,6 +1706,7 @@ paths:
   /v3/rtspsconns/list:
     get:
       operationId: rtspsConnsList
+      tags: [RTSP]
       summary: returns all RTSPS connections.
       description: ''
       parameters:
@@ -1286,6 +1745,7 @@ paths:
   /v3/rtspsconns/get/{id}:
     get:
       operationId: rtspsConnsGet
+      tags: [RTSP]
       summary: returns a RTSPS connection.
       description: ''
       parameters:
@@ -1308,6 +1768,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1318,6 +1784,7 @@ paths:
   /v3/rtspssessions/list:
     get:
       operationId: rtspsSessionsList
+      tags: [RTSP]
       summary: returns all RTSPS sessions.
       description: ''
       parameters:
@@ -1356,6 +1823,7 @@ paths:
   /v3/rtspssessions/get/{id}:
     get:
       operationId: rtspsSessionsGet
+      tags: [RTSP]
       summary: returns a RTSPS session.
       description: ''
       parameters:
@@ -1378,6 +1846,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: session not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1388,6 +1862,7 @@ paths:
   /v3/rtspssessions/kick/{id}:
     post:
       operationId: rtspsSessionsKick
+      tags: [RTSP]
       summary: kicks out a RTSPS session from the server.
       description: ''
       parameters:
@@ -1406,6 +1881,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: session not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1416,6 +1897,7 @@ paths:
   /v3/rtmpconns/list:
     get:
       operationId: rtmpConnsList
+      tags: [RTMP]
       summary: returns all RTMP connections.
       description: ''
       parameters:
@@ -1454,6 +1936,7 @@ paths:
   /v3/rtmpconns/get/{id}:
     get:
       operationId: rtmpConnectionsGet
+      tags: [RTMP]
       summary: returns a RTMP connection.
       description: ''
       parameters:
@@ -1476,6 +1959,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1486,6 +1975,7 @@ paths:
   /v3/rtmpconns/kick/{id}:
     post:
       operationId: rtmpConnsKick
+      tags: [RTMP]
       summary: kicks out a RTMP connection from the server.
       description: ''
       parameters:
@@ -1504,6 +1994,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1514,6 +2010,7 @@ paths:
   /v3/rtmpsconns/list:
     get:
       operationId: rtmpsConnsList
+      tags: [RTMP]
       summary: returns all RTMPS connections.
       description: ''
       parameters:
@@ -1552,6 +2049,7 @@ paths:
   /v3/rtmpsconns/get/{id}:
     get:
       operationId: rtmpsConnectionsGet
+      tags: [RTMP]
       summary: returns a RTMPS connection.
       description: ''
       parameters:
@@ -1574,6 +2072,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1584,6 +2088,7 @@ paths:
   /v3/rtmpsconns/kick/{id}:
     post:
       operationId: rtmpsConnsKick
+      tags: [RTMP]
       summary: kicks out a RTMPS connection from the server.
       description: ''
       parameters:
@@ -1602,6 +2107,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1612,6 +2123,7 @@ paths:
   /v3/srtconns/list:
     get:
       operationId: srtConnsList
+      tags: [SRT]
       summary: returns all SRT connections.
       description: ''
       parameters:
@@ -1650,6 +2162,7 @@ paths:
   /v3/srtconns/get/{id}:
     get:
       operationId: srtConnsGet
+      tags: [SRT]
       summary: returns a SRT connection.
       description: ''
       parameters:
@@ -1672,6 +2185,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1682,6 +2201,7 @@ paths:
   /v3/srtconns/kick/{id}:
     post:
       operationId: srtConnsKick
+      tags: [SRT]
       summary: kicks out a SRT connection from the server.
       description: ''
       parameters:
@@ -1700,6 +2220,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1710,6 +2236,7 @@ paths:
   /v3/webrtcsessions/list:
     get:
       operationId: webrtcSessionsList
+      tags: [WebRTC]
       summary: returns all WebRTC sessions.
       description: ''
       parameters:
@@ -1748,6 +2275,7 @@ paths:
   /v3/webrtcsessions/get/{id}:
     get:
       operationId: webrtcSessionsGet
+      tags: [WebRTC]
       summary: returns a WebRTC session.
       description: ''
       parameters:
@@ -1770,6 +2298,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: session not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: server error.
           content:
@@ -1780,6 +2314,7 @@ paths:
   /v3/webrtcsessions/kick/{id}:
     post:
       operationId: webrtcSessionsKick
+      tags: [WebRTC]
       summary: kicks out a WebRTC session from the server.
       description: ''
       parameters:
@@ -1794,6 +2329,131 @@ paths:
           description: the request was successful.
         '400':
           description: invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: session not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v3/recordings/list:
+    get:
+      operationId: recordingsList
+      tags: [Recordings]
+      summary: returns all recordings.
+      description: ''
+      parameters:
+      - name: page
+        in: query
+        description: page number.
+        schema:
+          type: integer
+          default: 0
+      - name: itemsPerPage
+        in: query
+        description: items per page.
+        schema:
+          type: integer
+          default: 100
+      responses:
+        '200':
+          description: the request was successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingList'
+        '400':
+          description: invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v3/recordings/get/{name}:
+    get:
+      operationId: recordingsGet
+      tags: [Recordings]
+      summary: returns recordings for a path.
+      description: ''
+      parameters:
+      - name: name
+        in: path
+        required: true
+        description: name of the path.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: the request was successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recording'
+        '400':
+          description: invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: path not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v3/recordings/deletesegment:
+    delete:
+      operationId: recordingsDeleteSegment
+      tags: [Recordings]
+      summary: deletes a recording segment.
+      description: ''
+      parameters:
+      - name: path
+        in: query
+        required: true
+        description: path.
+        schema:
+          type: string
+      - name: start
+        in: query
+        required: true
+        description: starting date of the segment.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: the request was successful.
+        '400':
+          description: invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: connection not found.
           content:
             application/json:
               schema:

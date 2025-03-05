@@ -37,10 +37,11 @@ type readerChunkStream struct {
 	curBodyRecv                uint32
 	curTimestampDelta          uint32
 	curTimestampDeltaAvailable bool
+	hasExtendedTimestamp       bool
 }
 
-func (rc *readerChunkStream) readChunk(c chunk.Chunk, chunkBodySize uint32) error {
-	err := c.Read(rc.mr.br, chunkBodySize)
+func (rc *readerChunkStream) readChunk(c chunk.Chunk, bodySize uint32, hasExtendedTimestamp bool) error {
+	err := c.Read(rc.mr.br, bodySize, hasExtendedTimestamp)
 	if err != nil {
 		return err
 	}
@@ -70,7 +71,7 @@ func (rc *readerChunkStream) readMessage(typ byte) (*Message, error) {
 			return nil, fmt.Errorf("received type 0 chunk but expected type 3 chunk")
 		}
 
-		err := rc.readChunk(&rc.mr.c0, rc.mr.chunkSize)
+		err := rc.readChunk(&rc.mr.c0, rc.mr.chunkSize, false)
 		if err != nil {
 			return nil, err
 		}
@@ -81,6 +82,7 @@ func (rc *readerChunkStream) readMessage(typ byte) (*Message, error) {
 		rc.curTimestampAvailable = true
 		rc.curTimestampDeltaAvailable = false
 		rc.curBodyLen = rc.mr.c0.BodyLen
+		rc.hasExtendedTimestamp = rc.mr.c0.Timestamp >= 0xFFFFFF
 
 		if rc.curBodyLen > maxBodySize {
 			return nil, fmt.Errorf("body size (%d) exceeds maximum (%d)", rc.curBodyLen, maxBodySize)
@@ -109,7 +111,7 @@ func (rc *readerChunkStream) readMessage(typ byte) (*Message, error) {
 			return nil, fmt.Errorf("received type 1 chunk but expected type 3 chunk")
 		}
 
-		err := rc.readChunk(&rc.mr.c1, rc.mr.chunkSize)
+		err := rc.readChunk(&rc.mr.c1, rc.mr.chunkSize, false)
 		if err != nil {
 			return nil, err
 		}
@@ -119,6 +121,7 @@ func (rc *readerChunkStream) readMessage(typ byte) (*Message, error) {
 		rc.curTimestampDelta = rc.mr.c1.TimestampDelta
 		rc.curTimestampDeltaAvailable = true
 		rc.curBodyLen = rc.mr.c1.BodyLen
+		rc.hasExtendedTimestamp = rc.mr.c1.TimestampDelta >= 0xFFFFFF
 
 		if rc.curBodyLen > maxBodySize {
 			return nil, fmt.Errorf("body size (%d) exceeds maximum (%d)", rc.curBodyLen, maxBodySize)
@@ -152,7 +155,7 @@ func (rc *readerChunkStream) readMessage(typ byte) (*Message, error) {
 			chunkBodyLen = rc.mr.chunkSize
 		}
 
-		err := rc.readChunk(&rc.mr.c2, chunkBodyLen)
+		err := rc.readChunk(&rc.mr.c2, chunkBodyLen, false)
 		if err != nil {
 			return nil, err
 		}
@@ -160,6 +163,7 @@ func (rc *readerChunkStream) readMessage(typ byte) (*Message, error) {
 		rc.curTimestamp += rc.mr.c2.TimestampDelta
 		rc.curTimestampDelta = rc.mr.c2.TimestampDelta
 		rc.curTimestampDeltaAvailable = true
+		rc.hasExtendedTimestamp = rc.mr.c2.TimestampDelta >= 0xFFFFFF
 
 		le := uint32(len(rc.mr.c2.Body))
 
@@ -182,7 +186,7 @@ func (rc *readerChunkStream) readMessage(typ byte) (*Message, error) {
 				chunkBodyLen = rc.mr.chunkSize
 			}
 
-			err := rc.readChunk(&rc.mr.c3, chunkBodyLen)
+			err := rc.readChunk(&rc.mr.c3, chunkBodyLen, rc.hasExtendedTimestamp)
 			if err != nil {
 				return nil, err
 			}
@@ -212,7 +216,7 @@ func (rc *readerChunkStream) readMessage(typ byte) (*Message, error) {
 			chunkBodyLen = rc.mr.chunkSize
 		}
 
-		err := rc.readChunk(&rc.mr.c3, chunkBodyLen)
+		err := rc.readChunk(&rc.mr.c3, chunkBodyLen, rc.hasExtendedTimestamp)
 		if err != nil {
 			return nil, err
 		}
@@ -293,6 +297,10 @@ func (r *Reader) Read() (*Message, error) {
 		typ := byt >> 6
 		chunkStreamID := byt & 0x3F
 
+		if chunkStreamID < 2 {
+			return nil, fmt.Errorf("extended chunk stream IDs are not supported (yet)")
+		}
+
 		rc, ok := r.chunkStreams[chunkStreamID]
 		if !ok {
 			rc = &readerChunkStream{mr: r}
@@ -303,7 +311,7 @@ func (r *Reader) Read() (*Message, error) {
 
 		msg, err := rc.readMessage(typ)
 		if err != nil {
-			if err == errMoreChunksNeeded {
+			if errors.Is(err, errMoreChunksNeeded) {
 				continue
 			}
 			return nil, err

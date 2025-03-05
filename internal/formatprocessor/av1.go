@@ -1,6 +1,7 @@
 package formatprocessor //nolint:dupl
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,12 +12,19 @@ import (
 	"github.com/bluenviron/mediamtx/internal/unit"
 )
 
+// AV1-related parameters
+var (
+	AV1DefaultSequenceHeader = []byte{
+		8, 0, 0, 0, 66, 167, 191, 228, 96, 13, 0, 64,
+	}
+)
+
 type formatProcessorAV1 struct {
 	udpMaxPayloadSize int
 	format            *format.AV1
-
-	encoder *rtpav1.Encoder
-	decoder *rtpav1.Decoder
+	encoder           *rtpav1.Encoder
+	decoder           *rtpav1.Decoder
+	randomStart       uint32
 }
 
 func newAV1(
@@ -31,6 +39,11 @@ func newAV1(
 
 	if generateRTPPackets {
 		err := t.createEncoder()
+		if err != nil {
+			return nil, err
+		}
+
+		t.randomStart, err = randUint32()
 		if err != nil {
 			return nil, err
 		}
@@ -54,13 +67,11 @@ func (t *formatProcessorAV1) ProcessUnit(uu unit.Unit) error { //nolint:dupl
 	if err != nil {
 		return err
 	}
-
-	ts := uint32(multiplyAndDivide(u.PTS, time.Duration(t.format.ClockRate()), time.Second))
-	for _, pkt := range pkts {
-		pkt.Timestamp += ts
-	}
-
 	u.RTPPackets = pkts
+
+	for _, pkt := range u.RTPPackets {
+		pkt.Timestamp += t.randomStart + uint32(u.PTS)
+	}
 
 	return nil
 }
@@ -68,9 +79,9 @@ func (t *formatProcessorAV1) ProcessUnit(uu unit.Unit) error { //nolint:dupl
 func (t *formatProcessorAV1) ProcessRTPPacket( //nolint:dupl
 	pkt *rtp.Packet,
 	ntp time.Time,
-	pts time.Duration,
+	pts int64,
 	hasNonRTSPReaders bool,
-) (Unit, error) {
+) (unit.Unit, error) {
 	u := &unit.AV1{
 		Base: unit.Base{
 			RTPPackets: []*rtp.Packet{pkt},
@@ -100,7 +111,8 @@ func (t *formatProcessorAV1) ProcessRTPPacket( //nolint:dupl
 
 		tu, err := t.decoder.Decode(pkt)
 		if err != nil {
-			if err == rtpav1.ErrNonStartingPacketAndNoPrevious || err == rtpav1.ErrMorePacketsNeeded {
+			if errors.Is(err, rtpav1.ErrNonStartingPacketAndNoPrevious) ||
+				errors.Is(err, rtpav1.ErrMorePacketsNeeded) {
 				return u, nil
 			}
 			return nil, err

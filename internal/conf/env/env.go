@@ -38,12 +38,12 @@ func loadEnvInternal(env map[string]string, prefix string, prv reflect.Value) er
 			}
 			err := i.UnmarshalEnv(prefix, ev)
 			if err != nil {
-				return fmt.Errorf("%s: %s", prefix, err)
+				return fmt.Errorf("%s: %w", prefix, err)
 			}
 		} else if envHasAtLeastAKeyWithPrefix(env, prefix) {
 			err := i.UnmarshalEnv(prefix, "")
 			if err != nil {
-				return fmt.Errorf("%s: %s", prefix, err)
+				return fmt.Errorf("%s: %w", prefix, err)
 			}
 		}
 		return nil
@@ -66,20 +66,20 @@ func loadEnvInternal(env map[string]string, prefix string, prv reflect.Value) er
 			}
 			iv, err := strconv.ParseInt(ev, 10, 32)
 			if err != nil {
-				return fmt.Errorf("%s: %s", prefix, err)
+				return fmt.Errorf("%s: %w", prefix, err)
 			}
 			prv.Elem().SetInt(iv)
 		}
 		return nil
 
-	case reflect.TypeOf(uint64(0)):
+	case reflect.TypeOf(uint(0)):
 		if ev, ok := env[prefix]; ok {
 			if prv.IsNil() {
 				prv.Set(reflect.New(rt))
 			}
 			iv, err := strconv.ParseUint(ev, 10, 32)
 			if err != nil {
-				return fmt.Errorf("%s: %s", prefix, err)
+				return fmt.Errorf("%s: %w", prefix, err)
 			}
 			prv.Elem().SetUint(iv)
 		}
@@ -92,7 +92,7 @@ func loadEnvInternal(env map[string]string, prefix string, prv reflect.Value) er
 			}
 			iv, err := strconv.ParseFloat(ev, 64)
 			if err != nil {
-				return fmt.Errorf("%s: %s", prefix, err)
+				return fmt.Errorf("%s: %w", prefix, err)
 			}
 			prv.Elem().SetFloat(iv)
 		}
@@ -184,6 +184,31 @@ func loadEnvInternal(env map[string]string, prefix string, prv reflect.Value) er
 						prv.Set(reflect.New(rt))
 					}
 					prv.Elem().Set(reflect.ValueOf(strings.Split(ev, ",")))
+				}
+			}
+			return nil
+
+		case rt.Elem() == reflect.TypeOf(float64(0)):
+			if ev, ok := env[prefix]; ok {
+				if ev == "" {
+					prv.Elem().Set(reflect.MakeSlice(prv.Elem().Type(), 0, 0))
+				} else {
+					if prv.IsNil() {
+						prv.Set(reflect.New(rt))
+					}
+
+					raw := strings.Split(ev, ",")
+					vals := make([]float64, len(raw))
+
+					for i, v := range raw {
+						tmp, err := strconv.ParseFloat(v, 64)
+						if err != nil {
+							return err
+						}
+						vals[i] = tmp
+					}
+
+					prv.Elem().Set(reflect.ValueOf(vals))
 				}
 			}
 			return nil
