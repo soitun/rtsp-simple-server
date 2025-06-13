@@ -89,6 +89,7 @@ authInternalUsers:
 # {
 #   "user": "user",
 #   "password": "password",
+#   "token": "token",
 #   "ip": "ip",
 #   "action": "publish|read|playback|api|metrics|pprof",
 #   "path": "path",
@@ -111,7 +112,6 @@ authHTTPExclude:
 # This JWT must contain the claim "mediamtx_permissions" with permissions,
 # for instance:
 # {
-#  ...
 #  "mediamtx_permissions": [
 #     {
 #       "action": "publish",
@@ -119,15 +119,24 @@ authHTTPExclude:
 #     }
 #   ]
 # }
-# Users are expected to pass the JWT in the Authorization header or as a query parameter.
+# Users are expected to pass the JWT in the Authorization header, password or query parameter.
 # This is the JWKS URL that will be used to pull (once) the public key that allows
 # to validate JWTs.
 authJWTJWKS:
+# If the JWKS URL has a self-signed or invalid certificate,
+# you can provide the fingerprint of the certificate in order to
+# validate it anyway. It can be obtained by running:
+# openssl s_client -connect jwt_jwks_domain:443 </dev/null 2>/dev/null | sed -n '/BEGIN/,/END/p' > server.crt
+# openssl x509 -in server.crt -noout -fingerprint -sha256 | cut -d "=" -f2 | tr -d ':'
+authJWTJWKSFingerprint:
 # name of the claim that contains permissions.
 authJWTClaimKey: mediamtx_permissions
 # Actions to exclude from JWT-based authentication.
 # Format is the same as the one of user permissions.
 authJWTExclude: []
+# allow passing the JWT through query parameters of HTTP requests (i.e. ?jwt=JWT).
+# This is a security risk.
+authJWTInHTTPQuery: true
 
 ###############################################
 # Global settings -> Control API
@@ -449,13 +458,12 @@ pathDefaults:
   sourceOnDemandCloseAfter: 10s
   # Maximum number of readers. Zero means no limit.
   maxReaders: 0
-  # SRT encryption passphrase require to read from this path
+  # SRT encryption passphrase required to read from this path.
   srtReadPassphrase:
   # If the stream is not available, redirect readers to this path.
   # It can be can be a relative path (i.e. /otherstream) or an absolute RTSP URL.
   fallback:
-  # Use original absolute timestamps of RTSP and WebRTC frames.
-  # In RTSP and WebRTC, absolute timestamps are transported through RTCP reports.
+  # Route original absolute timestamps of RTSP and WebRTC frames, instead of replacing them.
   useAbsoluteTimestamp: false
 
   ###############################################
@@ -466,7 +474,7 @@ pathDefaults:
   # Path of recording segments.
   # Extension is added automatically.
   # Available variables are %path (path name), %Y %m %d (year, month, day),
-  # %H %M %S (hours, minutes, seconds), %f (microseconds), %s (unix epoch).
+  # %H %M %S (hours, minutes, seconds), %f (microseconds), %z (time zone), %s (unix epoch).
   recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S-%f
   # Format of recorded segments.
   # Available formats are "fmp4" (fragmented MP4) and "mpegts" (MPEG-TS).
@@ -487,7 +495,7 @@ pathDefaults:
 
   # Allow another client to disconnect the current publisher and publish in its place.
   overridePublisher: yes
-  # SRT encryption passphrase required to publish to this path
+  # SRT encryption passphrase required to publish to this path.
   srtPublishPassphrase:
 
   ###############################################
